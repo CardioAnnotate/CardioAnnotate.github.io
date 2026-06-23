@@ -1,0 +1,2021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CardioAnnotate Help - ECG Annotation Toolkit Guide</title>
+<style>
+  :root { --bg:#ffffff; --text:#111827; --primary:#0ea5e9; --muted:#6b7280; }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:linear-gradient(135deg, #f0f9ff 0%, #ffffff 50%);
+    color:var(--text);
+    font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+    line-height:1.6;
+  }
+  header{
+    background:#ffffff;
+    padding:20px 0;
+    border-bottom:2px solid #e5e7eb;
+    box-shadow:0 2px 8px rgba(0,0,0,.05);
+  }
+  header .container{
+    max-width:900px;
+    margin:0 auto;
+    padding:0 20px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  header h1{
+    margin:0;
+    font-size:24px;
+    color:var(--primary);
+  }
+  header .subtitle{
+    font-size:14px;
+    color:var(--muted);
+    margin-top:4px;
+  }
+  .back-link{
+    color:var(--primary);
+    text-decoration:none;
+    font-size:14px;
+    padding:8px 16px;
+    border:1px solid var(--primary);
+    border-radius:8px;
+    transition:all 0.2s;
+  }
+  .back-link:hover{
+    background:var(--primary);
+    color:#ffffff;
+  }
+  
+  .content{
+    max-width:900px;
+    margin:40px auto;
+    padding:0 20px 60px;
+  }
+  
+  .toc{
+    background:#ffffff;
+    border:1px solid #e5e7eb;
+    border-radius:12px;
+    padding:24px;
+    margin-bottom:32px;
+    box-shadow:0 4px 16px rgba(0,0,0,.06);
+  }
+  .toc h2{
+    margin-top:0;
+    font-size:18px;
+    color:var(--text);
+  }
+  .toc ul{
+    list-style:none;
+    padding:0;
+    margin:0;
+  }
+  .toc li{
+    margin:8px 0;
+  }
+  .toc a{
+    color:var(--primary);
+    text-decoration:none;
+    font-size:15px;
+    transition:color 0.2s;
+  }
+  .toc a:hover{
+    color:#0284c7;
+    text-decoration:underline;
+  }
+  
+  section{
+    background:#ffffff;
+    border:1px solid #e5e7eb;
+    border-radius:12px;
+    padding:28px;
+    margin-bottom:24px;
+    box-shadow:0 4px 16px rgba(0,0,0,.06);
+  }
+  section h2{
+    margin-top:0;
+    font-size:22px;
+    color:var(--text);
+    border-bottom:2px solid #e5e7eb;
+    padding-bottom:12px;
+  }
+  section h3{
+    font-size:18px;
+    color:var(--text);
+    margin-top:24px;
+    margin-bottom:12px;
+  }
+  section h4{
+    font-size:16px;
+    color:var(--text);
+    margin-top:20px;
+    margin-bottom:10px;
+  }
+  
+  .feature{
+    background:#f9fafb;
+    border-left:4px solid var(--primary);
+    padding:16px;
+    margin:16px 0;
+    border-radius:4px;
+  }
+  .feature h4{
+    margin:0 0 8px;
+    font-size:16px;
+    color:var(--text);
+  }
+  .feature p{
+    margin:0;
+    font-size:14px;
+    color:var(--muted);
+  }
+  
+  .warning{
+    background:#fef3c7;
+    border-left:4px solid #eab308;
+    padding:16px;
+    margin:16px 0;
+    border-radius:4px;
+  }
+  .warning h4{
+    margin:0 0 8px;
+    font-size:16px;
+    color:#78350f;
+  }
+  .warning p{
+    margin:0;
+    font-size:14px;
+    color:#92400e;
+  }
+  
+  .tip{
+    background:#dcfce7;
+    border-left:4px solid #22c55e;
+    padding:16px;
+    margin:16px 0;
+    border-radius:4px;
+  }
+  .tip h4{
+    margin:0 0 8px;
+    font-size:16px;
+    color:#14532d;
+  }
+  .tip p{
+    margin:0;
+    font-size:14px;
+    color:#166534;
+  }
+  
+  code{
+    background:#f3f4f6;
+    padding:2px 6px;
+    border-radius:4px;
+    font-family:ui-monospace,monospace;
+    font-size:13px;
+    color:#dc2626;
+  }
+  
+  kbd{
+    background:#1f2937;
+    color:#ffffff;
+    padding:2px 8px;
+    border-radius:4px;
+    font-family:ui-monospace,monospace;
+    font-size:12px;
+    border:1px solid #374151;
+  }
+  
+  pre{
+    background:#1e293b;
+    color:#e2e8f0;
+    padding:16px;
+    border-radius:8px;
+    overflow-x:auto;
+    font-family:ui-monospace,monospace;
+    font-size:12px;
+    line-height:1.5;
+    margin:12px 0;
+  }
+  
+  .peak-legend{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+    margin:16px 0;
+  }
+  .peak-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .peak-dot{
+    width:14px;
+    height:14px;
+    border-radius:50%;
+  }
+  .peak-dot.r{background:#ef4444}
+  .peak-dot.p{background:#22c55e}
+  .peak-dot.t{background:#a78bfa}
+  .peak-dot.u{background:#f59e0b}
+  .peak-dot.q{background:#06b6d4}
+  .peak-dot.s{background:#ec4899}
+  
+  .beat-type-table{
+    width:100%;
+    border-collapse:collapse;
+    margin:16px 0;
+    font-size:14px;
+  }
+  .beat-type-table th{
+    background:#f3f4f6;
+    padding:8px;
+    text-align:left;
+    border:1px solid #e5e7eb;
+  }
+  .beat-type-table td{
+    padding:8px;
+    border:1px solid #e5e7eb;
+    vertical-align:top;
+  }
+  .beat-type-table code{
+    font-size:12px;
+  }
+  
+  ul, ol{
+    padding-left:24px;
+  }
+  li{
+    margin:8px 0;
+  }
+  
+  footer{
+    background:#f9fafb;
+    border-top:1px solid #e5e7eb;
+    padding:24px 0;
+    margin-top:40px;
+    text-align:center;
+    color:var(--muted);
+    font-size:14px;
+  }
+
+  /* Modal styles for BibTeX */
+  .modal-overlay{
+    display:none;
+    position:fixed;
+    top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.5);
+    z-index:1000;
+    align-items:center;
+    justify-content:center;
+  }
+  .modal-overlay.show{
+    display:flex;
+  }
+  .modal-content{
+    background:#fff;
+    border-radius:12px;
+    padding:24px;
+    max-width:700px;
+    width:90%;
+    max-height:80vh;
+    overflow-y:auto;
+    box-shadow:0 8px 32px rgba(0,0,0,0.2);
+  }
+  .modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:16px;
+  }
+  .modal-header h3{
+    margin:0;
+    font-size:18px;
+  }
+  .modal-close{
+    background:none;
+    border:none;
+    font-size:24px;
+    cursor:pointer;
+    color:#6b7280;
+    padding:4px 8px;
+  }
+  .modal-close:hover{
+    color:#ef4444;
+  }
+  .bibtex-box{
+    background:#1f2937;
+    color:#e5e7eb;
+    padding:16px;
+    border-radius:8px;
+    font-family:ui-monospace,monospace;
+    font-size:12px;
+    white-space:pre-wrap;
+    margin:16px 0;
+    position:relative;
+  }
+  .copy-btn{
+    background:#3b82f6;
+    color:#fff;
+    border:none;
+    padding:6px 12px;
+    border-radius:6px;
+    cursor:pointer;
+    font-size:12px;
+    transition:background 0.2s;
+  }
+  .copy-btn:hover{
+    background:#2563eb;
+  }
+  .copy-btn.copied{
+    background:#10b981;
+  }
+  .version-link{
+    background:none;
+    border:none;
+    color:var(--primary);
+    cursor:pointer;
+    font:inherit;
+    padding:0;
+    text-decoration:underline;
+  }
+  .version-link:hover{
+    color:#0284c7;
+  }
+  .changelog-list{
+    padding-left:22px;
+    margin:12px 0 0;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div>
+        <h1>📖 CardioAnnotate Help</h1>
+        <div class="subtitle">A Toolkit for ECG Peak Labeling and Processing</div>
+      </div>
+        <button type="button" class="back-link" onclick="window.close();"> ← Back to Annotator</button>
+    </div>
+  </header>
+
+  <div class="content">
+    <div class="toc">
+      <h2>📑 Table of Contents</h2>
+      <ul>
+        <li><a href="#overview">1. Overview & Getting Started</a></li>
+        <li><a href="#loading">2. Loading ECG Data</a></li>
+        <li><a href="#file-formats">3. File Formats (Input & Output)</a>
+          <ul style="padding-left:20px; margin-top:4px;">
+            <li><a href="#input-formats">3.1 Input File Formats</a></li>
+            <li><a href="#output-formats">3.2 Output File Formats</a></li>
+            <li><a href="#session-format">3.3 Full Session Format</a></li>
+          </ul>
+        </li>
+        <li><a href="#annotation">4. Peak Annotation</a>
+          <ul style="padding-left:20px; margin-top:4px;">
+            <li><a href="#beat-classification">4.1 R-Peak Beat Classification</a></li>
+            <li><a href="#keyboard-shortcuts">4.2 Keyboard Shortcuts</a></li>
+            <li><a href="#auto-detection">4.3 Automatic Peak Detection</a></li>
+          </ul>
+        </li>
+        <li><a href="#export">5. Export & Sharing</a></li>
+        <li><a href="#processing">6. Signal Processing</a></li>
+        <li><a href="#statistics">7. Statistics & Analysis</a>
+          <ul style="padding-left:20px; margin-top:4px;">
+            <li><a href="#basic-stats">7.1 Basic ECG Metrics</a></li>
+            <li><a href="#sqi">7.2 Signal Quality Indices (SQI)</a></li>
+            <li><a href="#hrv">7.3 Heart Rate Variability (HRV)</a></li>
+            <li><a href="#rr-correction">7.4 RR Error Detection & GP Correction</a></li>
+          </ul>
+        </li>
+        <li><a href="#dark-mode">8. Dark Mode</a></li>
+        <li><a href="#tips">9. Tips & Best Practices</a></li>
+        <li><a href="#troubleshooting">10. Troubleshooting</a></li>
+        <li><a href="#citation">11. Citation & Credits</a></li>
+      </ul>
+    </div>
+
+    <section id="overview">
+      <h2>🏠 1. Overview & Getting Started</h2>
+      
+      <p>CardioAnnotate is a browser-based ECG annotation toolkit that allows you to:</p>
+      <ul>
+        <li>Load and visualize ECG signals from WFDB files, CSV, or NPZ bundles</li>
+        <li>Manually annotate R, P, T, U, Q, and S peaks across multiple channels</li>
+        <li><strong>Classify R-peaks by beat type</strong> using 19 WFDB annotation standards</li>
+        <li><strong>Automatic peak detection</strong> using Find Peaks or Pan-Tompkins algorithms</li>
+        <li><strong>Import WFDB annotation files</strong> (<code>.atr</code> and wave-specific annotation files)</li>
+        <li>Apply signal processing (resampling, filtering, inversion)</li>
+        <li><strong>Compute Signal Quality Indices (SQI)</strong> for the visible segment</li>
+        <li><strong>Compute HRV metrics</strong> (time-domain and frequency-domain) for the visible segment</li>
+        <li><strong>Detect and correct RR interval outliers</strong> using Gaussian Process regression</li>
+        <li>Export annotations in JSON, CSV, WFDB, or NPZ format with enhanced options</li>
+        <li><strong>Export and import full sessions</strong> in JSON, MAT, or NPZ format to restore the complete analysis state</li>
+        <li>View real-time ECG statistics and intervals</li>
+        <li>Toggle between <strong>dark and light themes</strong></li>
+      </ul>
+
+      <div class="tip">
+        <h4>💡 100% Privacy-Preserving</h4>
+        <p>All processing happens in your browser using Pyodide (Python in WebAssembly). No data is uploaded to any server.</p>
+      </div>
+
+      <h3>Peak Types</h3>
+      <div class="peak-legend">
+        <div class="peak-item"><span class="peak-dot r"></span> <strong>R-peaks</strong> — QRS complex maxima (with beat classification)</div>
+        <div class="peak-item"><span class="peak-dot p"></span> <strong>P-peaks</strong> — Atrial depolarization</div>
+        <div class="peak-item"><span class="peak-dot q"></span> <strong>Q-waves</strong> — QRS onset (minima)</div>
+        <div class="peak-item"><span class="peak-dot s"></span> <strong>S-waves</strong> — QRS termination (minima)</div>
+        <div class="peak-item"><span class="peak-dot t"></span> <strong>T-peaks</strong> — Ventricular repolarization</div>
+        <div class="peak-item"><span class="peak-dot u"></span> <strong>U-waves</strong> — Late repolarization</div>
+      </div>
+    </section>
+
+    <section id="loading">
+      <h2>📂 2. Loading ECG Data</h2>
+      
+      <h3>Option A: Load WFDB Files</h3>
+      <ol>
+        <li>Click <strong>"Choose Files"</strong> in the Load section</li>
+        <li>Select both <code>.hea</code> (header) and <code>.dat</code> or <code>.mat</code> (signal) files with the same basename
+          <ul>
+            <li>Example: <code>100.hea</code> + <code>100.dat</code></li>
+          </ul>
+        </li>
+        <li>The signal loads automatically after the file selection is complete</li>
+      </ol>
+      
+      <div class="tip">
+        <h4>💡 Where to Find WFDB Files</h4>
+        <p>Download ECG databases from <a href="https://physionet.org/" target="_blank">PhysioNet</a> (MIT-BIH, LUDB, INCART, etc.)</p>
+      </div>
+
+      <div class="feature">
+        <h4>Loading Status</h4>
+        <p>A small spinner appears next to the signal file input while a signal is loading. It disappears automatically when loading finishes, whether the file loads successfully or an error is reported.</p>
+      </div>
+
+      <h3>Option B: Load CSV Files</h3>
+      <ol>
+        <li>Click <strong>"Load"</strong> button in the "Import from CSV" row</li>
+        <li>Select a CSV file containing ECG data</li>
+      </ol>
+      
+      <p>CSV Requirements:</p>
+      <ul>
+        <li>First row must be a header with column names</li>
+        <li>Must include one of:
+          <ul>
+            <li><code>fs</code> or <code>sampling_rate</code> column, OR</li>
+            <li><code>time_s</code> or <code>time</code> column (sampling rate will be calculated)</li>
+          </ul>
+        </li>
+        <li>Signal columns should contain numeric values</li>
+        <li>Example columns: <code>fs, time_s, MLII, V1, V2</code></li>
+      </ul>
+
+      <h3>Option C: Load NPZ Bundle</h3>
+      <ol>
+        <li>Click <strong>"Load"</strong> button in the "Import bundle (.npz)" row</li>
+        <li>Select an NPZ file previously exported from CardioAnnotate</li>
+      </ol>
+      
+      <div class="tip">
+        <h4>💡 NPZ Bundles</h4>
+        <p>NPZ bundles are a convenient format that packages the processed signal data, sampling frequency, channel names, and all peak annotations into a single compressed file. Use a full session export when you need to restore the complete workspace, including settings, view window, corrections, and computed results.</p>
+      </div>
+
+      <h3>Option D: Load Full Session</h3>
+      <ol>
+        <li>Click the session import control in the Session section</li>
+        <li>Select a CardioAnnotate session file in <code>.json</code>, <code>.mat</code>, or <code>.npz</code> format</li>
+        <li>The file format is detected automatically, and the workspace is restored from the saved session state</li>
+      </ol>
+
+      <div class="feature">
+        <h4>Full Session Restore</h4>
+        <p>Session import restores the signal viewer, annotations, RR corrections, processing settings, detector settings, selected channel, zoom window, and saved analysis results. SQI, HRV, and stationarity panels are recomputed after import so that the displayed values reproduce the saved session.</p>
+      </div>
+    </section>
+
+    <section id="file-formats">
+      <h2>📁 3. File Formats (Input & Output)</h2>
+      
+      <div id="input-formats">
+        <h3>3.1 Input File Formats</h3>
+        
+        <!-- WFDB Format -->
+        <h4>WFDB Format (.hea + .dat/.mat)</h4>
+        <p>The PhysioNet standard format for physiological signals, consisting of two files:</p>
+        
+        <p><strong>Header File (.hea) Structure:</strong></p>
+<pre>record_name n_signals sampling_frequency n_samples
+filename format gain baseline units resolution 0 0 channel_name
+filename format gain baseline units resolution 0 0 channel_name
+...
+# Optional comment lines starting with #</pre>
+
+        <p><strong>Example .hea file:</strong></p>
+<pre>100 2 360 650000
+100.dat 212 200 1024 mV 11 0 0 MLII
+100.dat 212 200 1024 mV 11 0 0 V5
+# Age: 69  Sex: M</pre>
+
+        <p><strong>Field descriptions:</strong></p>
+        <table class="beat-type-table">
+          <thead>
+            <tr><th>Field</th><th>Description</th><th>Example</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>record_name</td><td>Base name of the record</td><td>100</td></tr>
+            <tr><td>n_signals</td><td>Number of channels</td><td>2</td></tr>
+            <tr><td>sampling_frequency</td><td>Samples per second (Hz)</td><td>360</td></tr>
+            <tr><td>n_samples</td><td>Total samples per channel</td><td>650000</td></tr>
+            <tr><td>filename</td><td>Signal data file name</td><td>100.dat</td></tr>
+            <tr><td>format</td><td>Storage format (212=12-bit, 16=16-bit, 80=8-bit offset)</td><td>212</td></tr>
+            <tr><td>gain</td><td>ADC units per physical unit</td><td>200</td></tr>
+            <tr><td>baseline</td><td>ADC zero value</td><td>1024</td></tr>
+            <tr><td>units</td><td>Physical units</td><td>mV</td></tr>
+            <tr><td>resolution</td><td>ADC resolution in bits</td><td>11</td></tr>
+            <tr><td>channel_name</td><td>Signal/lead name</td><td>MLII</td></tr>
+          </tbody>
+        </table>
+        
+        <p><strong>Signal File (.dat) Structure:</strong></p>
+        <ul>
+          <li>Binary file containing interleaved signal samples</li>
+          <li><strong>Format 212:</strong> 12-bit samples, 2 samples packed in 3 bytes (little-endian)</li>
+          <li><strong>Format 16:</strong> 16-bit signed integers, 2 bytes per sample (little-endian)</li>
+          <li><strong>Format 80:</strong> 8-bit unsigned with offset 128</li>
+          <li>Physical value = (ADC_value − baseline) / gain</li>
+        </ul>
+
+        <div class="feature">
+          <h4>Format 212 Byte Layout</h4>
+          <p>Two 12-bit samples (A, B) stored in 3 bytes:</p>
+          <p><code>Byte0 = A[7:0], Byte1 = B[3:0]|A[11:8], Byte2 = B[11:4]</code></p>
+        </div>
+
+        <!-- CSV Format -->
+        <h4>CSV Format (.csv)</h4>
+        <p>Comma-separated values with a header row.</p>
+        
+        <p><strong>Structure:</strong></p>
+<pre>fs,time_s,MLII,V1,V5
+360,0.000000,0.123,-0.045,0.089
+360,0.002778,0.125,-0.043,0.091
+360,0.005556,0.128,-0.041,0.094
+360,0.008333,0.132,-0.038,0.098
+...</pre>
+
+        <p><strong>Required columns (one of the following):</strong></p>
+        <table class="beat-type-table">
+          <thead>
+            <tr><th>Column Name(s)</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>fs</code>, <code>sampling_rate</code>, or <code>sampling_frequency</code></td><td>Sampling rate in Hz (same value repeated each row)</td></tr>
+            <tr><td><code>time_s</code> or <code>time</code></td><td>Time in seconds (fs calculated from Δtime)</td></tr>
+          </tbody>
+        </table>
+
+        <p><strong>Signal columns:</strong></p>
+        <ul>
+          <li>Any numeric column not in the exclude list becomes a channel</li>
+          <li>Excluded column names: <code>fs</code>, <code>sampling_rate</code>, <code>sampling_frequency</code>, <code>time_s</code>, <code>time</code>, <code>index</code>, <code>sample</code></li>
+          <li>Values should be in physical units (e.g., mV)</li>
+        </ul>
+
+        <!-- NPZ Bundle Format -->
+        <h4>NPZ Bundle Format (.npz)</h4>
+        <p>Compressed NumPy archive containing signal data and metadata.</p>
+        
+        <p><strong>Structure:</strong></p>
+<pre>{
+  "signals": numpy.ndarray,     // Shape: (n_channels, n_samples), dtype: float64
+  "meta": JSON string           // Metadata as serialized JSON
+}</pre>
+
+        <p><strong>Meta JSON structure:</strong></p>
+<pre>{
+  "fs": 360,                              // Sampling frequency in Hz
+  "channelNames": ["MLII", "V1", "V5"],   // Array of channel names
+  "units": ["mV", "mV", "mV"],            // Units per channel (optional)
+  "recordBase": "100",                    // Original record name (optional)
+  "annotations": {                        // Peak annotations
+    "R": {
+      "0": [                              // Channel index as string key
+        {"index": 77, "type": "N"},       // R-peaks: objects with index and type
+        {"index": 370, "type": "N"},
+        {"index": 662, "type": "V"}
+      ],
+      "1": [{"index": 79, "type": "N"}]
+    },
+    "P": {
+      "0": [30, 320, 610],                // Other peaks: arrays of sample indices
+      "1": [32, 322]
+    },
+    "Q": {"0": [70, 363, 655]},
+    "S": {"0": [85, 378, 670]},
+    "T": {"0": [180, 475, 765]},
+    "U": {"0": []}
+  }
+}</pre>
+
+        <p>Legacy bundles that use <code>peaks</code> for the annotation map may still be loaded when supported by the importer.</p>
+
+        <!-- Annotation JSON Format -->
+        <h4>Annotation JSON Format (.json)</h4>
+        <p>JSON file containing peak annotations only (no signal data).</p>
+        
+        <p><strong>Structure:</strong></p>
+<pre>{
+  "fs": 360,
+  "channelNames": ["MLII", "V1"],
+  "annotations": {
+    "R": {
+      "0": [
+        {"index": 77, "type": "N"},
+        {"index": 370, "type": "N"},
+        {"index": 662, "type": "V"},
+        {"index": 955, "type": "A"}
+      ],
+      "1": [
+        {"index": 79, "type": "N"},
+        {"index": 372, "type": "N"}
+      ]
+    },
+    "P": {
+      "0": [30, 320, 610, 905],
+      "1": [32, 322, 612]
+    },
+    "Q": {
+      "0": [70, 363, 655, 948],
+      "1": []
+    },
+    "S": {
+      "0": [85, 378, 670, 963],
+      "1": []
+    },
+    "T": {
+      "0": [180, 475, 765, 1060],
+      "1": [182, 477]
+    },
+    "U": {
+      "0": [],
+      "1": []
+    }
+  }
+}</pre>
+
+        <p><strong>Key points:</strong></p>
+        <ul>
+          <li>The top-level annotation map is named <code>annotations</code>, following the <code>ecg-annotator-json-v2</code> schema</li>
+          <li>R-peaks: Array of objects with <code>{"index": sample_number, "type": "beat_code"}</code></li>
+          <li>P, Q, S, T, U peaks: Arrays of sample indices (integers)</li>
+          <li>Channel indices are string keys ("0", "1", "2", ...)</li>
+          <li>JSON files that use the legacy top-level <code>peaks</code> key are also supported for import</li>
+          <li>Legacy format (R-peaks as simple integer arrays) is also supported for import</li>
+        </ul>
+
+        <!-- Annotation CSV Format -->
+        <h4>Annotation CSV Format (.csv)</h4>
+        <p>Tabular format for peak annotations.</p>
+        
+        <p><strong>Structure:</strong></p>
+<pre>channel_index,label,index,time_s,beat_type
+0,R,77,0.214,N
+0,R,370,1.028,N
+0,R,662,1.839,V
+0,R,955,2.653,A
+0,P,30,0.083,
+0,P,320,0.889,
+0,Q,70,0.194,
+0,S,85,0.236,
+0,T,180,0.500,
+1,R,79,0.219,N
+1,P,32,0.089,</pre>
+
+        <p><strong>Column descriptions:</strong></p>
+        <table class="beat-type-table">
+          <thead>
+            <tr><th>Column</th><th>Required</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>channel_index</code></td><td>Yes</td><td>Zero-indexed channel number</td></tr>
+            <tr><td><code>label</code></td><td>Yes</td><td>Peak type: R, P, Q, S, T, or U</td></tr>
+            <tr><td><code>index</code></td><td>Yes*</td><td>Sample index (integer)</td></tr>
+            <tr><td><code>time_s</code></td><td>Yes*</td><td>Time in seconds (alternative to index)</td></tr>
+            <tr><td><code>beat_type</code></td><td>No</td><td>WFDB beat code for R-peaks (N, V, A, L, R, etc.)</td></tr>
+          </tbody>
+        </table>
+        <p>*Either <code>index</code> or <code>time_s</code> is required.</p>
+
+        <!-- WFDB Annotation Import Format -->
+        <h4>WFDB Annotation Import Files (<code>.atr</code> / wave annotations)</h4>
+        <p>WFDB annotation files can be imported after a signal is loaded. The file picker accepts all file extensions so that non-standard WFDB annotation extensions remain selectable.</p>
+
+        <p><strong>Supported import forms:</strong></p>
+        <table class="beat-type-table">
+          <thead>
+            <tr><th>File Type</th><th>Import Behavior</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>.atr</code></td><td>Symbol-based import. Beat annotation codes such as <code>N</code>, <code>L</code>, <code>V</code>, <code>A</code>, and related WFDB beat codes are imported as R-peaks with the beat type preserved. Wave symbols are imported as <code>p</code> → P, <code>t</code> → T, <code>u</code> → U, <code>q</code> → Q, and <code>s</code> → S.</td></tr>
+            <tr><td><code>.qrs</code></td><td>All annotations in the file are imported as R-peaks.</td></tr>
+            <tr><td><code>.pwave</code></td><td>All annotations in the file are imported as P-peaks.</td></tr>
+            <tr><td><code>.twave</code></td><td>All annotations in the file are imported as T-peaks.</td></tr>
+            <tr><td><code>.uwave</code></td><td>All annotations in the file are imported as U-waves.</td></tr>
+            <tr><td><code>.qwave</code></td><td>All annotations in the file are imported as Q-waves.</td></tr>
+            <tr><td><code>.swave</code></td><td>All annotations in the file are imported as S-waves.</td></tr>
+          </tbody>
+        </table>
+        <p>Recognized extension variants are mapped by their extension name. Imported WFDB annotations are merged into all loaded channels.</p>
+      </div>
+
+      <div id="output-formats">
+        <h3>3.2 Output File Formats</h3>
+
+        <!-- Export JSON -->
+        <h4>Annotation JSON Export</h4>
+        <p>Same structure as input JSON, with added export timestamp and the <code>annotations</code> top-level key.</p>
+        
+        <p><strong>Structure:</strong></p>
+<pre>{
+  "exportedAt": "2026-01-15T10:30:00.000Z",
+  "fs": 360,
+  "channelNames": ["MLII", "V1"],
+  "annotations": {
+    "R": {
+      "0": [
+        {"index": 77, "type": "N"},
+        {"index": 370, "type": "V"}
+      ]
+    },
+    "P": {"0": [30, 320]},
+    "Q": {"0": [70, 363]},
+    "S": {"0": [85, 378]},
+    "T": {"0": [180, 475]},
+    "U": {"0": []}
+  }
+}</pre>
+
+        <!-- Export CSV Annotations -->
+        <h4>Annotation CSV Export</h4>
+        <p>Tabular export with full metadata per peak.</p>
+        
+        <p><strong>Structure:</strong></p>
+<pre>peak_type,channel_index,channel_name,sample_index,time_s,beat_type
+R,0,MLII,77,0.214,N
+R,0,MLII,370,1.028,V
+R,0,MLII,662,1.839,A
+P,0,MLII,30,0.083,
+P,0,MLII,320,0.889,
+Q,0,MLII,70,0.194,
+S,0,MLII,85,0.236,
+T,0,MLII,180,0.500,
+R,1,V1,79,0.219,N</pre>
+
+        <p><strong>Column descriptions:</strong></p>
+        <table class="beat-type-table">
+          <thead>
+            <tr><th>Column</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>peak_type</code></td><td>R, P, Q, S, T, or U</td></tr>
+            <tr><td><code>channel_index</code></td><td>Zero-indexed channel number</td></tr>
+            <tr><td><code>channel_name</code></td><td>Human-readable channel label</td></tr>
+            <tr><td><code>sample_index</code></td><td>Peak location in samples</td></tr>
+            <tr><td><code>time_s</code></td><td>Peak time = sample_index / fs</td></tr>
+            <tr><td><code>beat_type</code></td><td>WFDB code (R-peaks only, empty for others)</td></tr>
+          </tbody>
+        </table>
+
+        <!-- Export ECG CSV -->
+        <h4>ECG Signal CSV Export</h4>
+        <p>Exports the current (possibly processed) signal data.</p>
+        
+        <p><strong>Structure:</strong></p>
+<pre>fs,time_s,MLII,V1,V5
+360,0.000000,0.123,-0.045,0.089
+360,0.002778,0.125,-0.043,0.091
+360,0.005556,0.128,-0.041,0.094
+360,0.008333,0.132,-0.038,0.098
+...</pre>
+
+        <p><strong>Notes:</strong></p>
+        <ul>
+          <li><code>fs</code> column contains the sampling frequency (repeated each row)</li>
+          <li><code>time_s</code> is computed as sample_index / fs</li>
+          <li>Signal columns contain values after any processing (filtering, resampling)</li>
+        </ul>
+
+        <!-- Export NPZ -->
+        <h4>NPZ Bundle Export</h4>
+        <p>Signal-and-annotation bundle with processed signals and all annotations.</p>
+        
+        <p><strong>Structure:</strong></p>
+<pre>numpy.savez_compressed("export.npz",
+  signals=numpy.array(...),  // Shape: (n_channels, n_samples), dtype: float64
+  meta=json.dumps({
+    "fs": 360,
+    "channelNames": ["MLII", "V1"],
+    "units": ["mV", "mV"],
+    "recordBase": "100",
+    "annotations": { ... }   // Same structure as annotation JSON
+  })
+)</pre>
+
+
+        <div id="session-format">
+          <h3>3.3 Full Session Format</h3>
+          <p>A full session file stores the complete state of an analysis in a single, self-contained container. Use this format when an analysis must be paused and resumed, archived, shared with collaborators, or reopened exactly as it was left.</p>
+
+          <h4>Recorded Session State</h4>
+          <table class="beat-type-table">
+            <thead>
+              <tr><th>State Category</th><th>What Is Stored</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Signal data</strong></td><td>The current processed waveform for every channel and the original unmodified signal, together with sampling frequency, channel names, physical units, and record identifier. Retaining both processed and original signals keeps filtering, resampling, inversion, and reset available after reload.</td></tr>
+              <tr><td><strong>Annotations and corrections</strong></td><td>All fiducial annotations, R-peak beat-type labels, RR intervals flagged by quality control, and any RR series corrected by Gaussian Process regression.</td></tr>
+              <tr><td><strong>Processing and analysis settings</strong></td><td>Filtering and resampling parameters, per-peak-type detector settings for Find Peaks and Pan-Tompkins, RR quality-control rules, selected GP kernel and hyperparameters, SQI parameters, and interface-control state.</td></tr>
+              <tr><td><strong>View and selection</strong></td><td>The active channel and current zoom window. Because SQI and HRV are evaluated on the visible segment, saving the window fixes the exact sample range used for segment-level analysis.</td></tr>
+              <tr><td><strong>Computed results</strong></td><td>A provenance snapshot of reported measures, including pSQI, kSQI, basSQI, lineSQI; time- and frequency-domain HRV metrics; the ADF stationarity test; and summary statistics.</td></tr>
+            </tbody>
+          </table>
+
+          <h4>Session Container Formats</h4>
+          <p>Sessions can be exported as <code>.json</code>, <code>.mat</code>, or <code>.npz</code>. All three contain the same analysis state. In the <code>.mat</code> and <code>.npz</code> containers, signal arrays are stored as native numeric arrays for direct use in MATLAB or Python, while annotations, settings, view state, corrections, and results are embedded as a JSON record in the same container.</p>
+
+          <p><strong>Session JSON structure (conceptual):</strong></p>
+<pre>{
+  "sessionVersion": "full-state-v1",
+  "exportedAt": "2026-01-15T10:30:00.000Z",
+  "signals": {
+    "processed": [[...]],
+    "original": [[...]],
+    "fs": 360,
+    "channelNames": ["MLII", "V1"],
+    "units": ["mV", "mV"],
+    "recordBase": "100"
+  },
+  "annotations": { ... },
+  "corrections": {
+    "flaggedRR": [...],
+    "gpCorrectedRR": [...]
+  },
+  "settings": { ... },
+  "view": {
+    "activeChannel": 0,
+    "xRange": [0.0, 10.5]
+  },
+  "results": {
+    "sqi": { ... },
+    "hrv": { ... },
+    "adf": { ... },
+    "summary": { ... }
+  }
+}</pre>
+
+          <h4>Export Type Coverage</h4>
+          <table class="beat-type-table">
+            <thead>
+              <tr>
+                <th>State</th>
+                <th>Annotations<br>(JSON/CSV)</th>
+                <th>Signal Bundle<br>(NPZ)</th>
+                <th>Session<br>(full state)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Signal data (processed + original)</td><td></td><td>✓</td><td>✓</td></tr>
+              <tr><td>Peaks and beat-type labels</td><td>✓</td><td>✓</td><td>✓</td></tr>
+              <tr><td>Flagged / GP-corrected RR</td><td></td><td></td><td>✓</td></tr>
+              <tr><td>Processing and detector settings</td><td></td><td></td><td>✓</td></tr>
+              <tr><td>View / segment selection</td><td></td><td></td><td>✓</td></tr>
+              <tr><td>Computed results (SQI, HRV, ADF)</td><td></td><td></td><td>✓</td></tr>
+            </tbody>
+          </table>
+
+          <div class="tip">
+            <h4>💡 When to Use a Full Session</h4>
+            <p>Use annotation exports for peak labels only, NPZ bundles for signal-plus-annotation exchange, and full sessions when the workspace must reopen with the same processing pipeline, correction state, view window, and analysis panels.</p>
+          </div>
+        </div>
+
+        <!-- Export WFDB -->
+        <h4>WFDB Export</h4>
+        <p>PhysioNet-compatible format with header, signal, and annotation files.</p>
+        
+        <p><strong>Files created:</strong></p>
+        
+        <p><strong>Header file (record.hea):</strong></p>
+<pre>export 2 360 650000
+export.dat 16 200(0) 0 16 0 0 0 MLII
+export.dat 16 200(0) 0 16 0 0 0 V1</pre>
+
+        <p><strong>Signal file (record.dat):</strong></p>
+        <ul>
+          <li>Format 16: 16-bit signed integers, little-endian</li>
+          <li>Gain: 200 ADC units per mV (fixed)</li>
+          <li>Baseline: 0</li>
+          <li>Channels interleaved sample-by-sample</li>
+        </ul>
+
+        <p><strong>Annotation file(s) - Single file mode (.atr):</strong></p>
+<pre>Binary WFDB annotation format containing:
+- Sample number (delta-encoded)
+- Annotation type code
+- Subtype (beat classification for R-peaks)
+- Channel number</pre>
+
+        <p><strong>Peak type to WFDB code mapping:</strong></p>
+        <table class="beat-type-table">
+          <thead>
+            <tr><th>Peak Type</th><th>WFDB Code</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>R-peaks</td><td>N, V, A, L, R, etc.</td><td>Uses assigned beat type</td></tr>
+            <tr><td>P-peaks</td><td><code>p</code></td><td>P-wave peak</td></tr>
+            <tr><td>T-peaks</td><td><code>t</code></td><td>T-wave peak</td></tr>
+            <tr><td>U-waves</td><td><code>u</code></td><td>U-wave</td></tr>
+            <tr><td>Q-waves</td><td><code>(</code></td><td>Waveform onset</td></tr>
+            <tr><td>S-waves</td><td><code>)</code></td><td>Waveform end</td></tr>
+          </tbody>
+        </table>
+
+        <p><strong>Annotation files - Separate files mode:</strong></p>
+        <table class="beat-type-table">
+          <thead>
+            <tr><th>File Extension</th><th>Contents</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>record.atr</code></td><td>R-peaks with beat type annotations</td></tr>
+            <tr><td><code>record.pwave</code></td><td>P-peaks</td></tr>
+            <tr><td><code>record.qwave</code></td><td>Q-waves</td></tr>
+            <tr><td><code>record.swave</code></td><td>S-waves</td></tr>
+            <tr><td><code>record.twave</code></td><td>T-peaks</td></tr>
+            <tr><td><code>record.uwave</code></td><td>U-waves</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="annotation">
+      <h2>✏️ 4. Peak Annotation</h2>
+      
+      <h3>Basic Annotation Workflow</h3>
+      <ol>
+        <li>Select a <strong>Channel</strong> from the dropdown</li>
+        <li>Use the mouse scroll wheel or plot controls to <strong>zoom</strong> into a region of interest</li>
+        <li>Select an annotation <strong>Mode</strong>:
+          <ul>
+            <li><strong>Navigate</strong> — Pan and zoom only</li>
+            <li><strong>Add R (Normal)</strong> — Click to add R-peaks (default type: Normal)</li>
+            <li><strong>Add P</strong> — Click to add P-peaks</li>
+            <li><strong>Add T</strong> — Click to add T-peaks</li>
+            <li><strong>Add U</strong> — Click to add U-waves</li>
+            <li><strong>Add Q</strong> — Click to add Q-waves</li>
+            <li><strong>Add S</strong> — Click to add S-waves</li>
+            <li><strong>Remove nearest</strong> — Click near a peak to delete it</li>
+          </ul>
+        </li>
+        <li>Click on the signal where you want to place peaks</li>
+      </ol>
+
+      <div class="tip">
+        <h4>💡 Zoom Persists</h4>
+        <p>Your zoom state is preserved when switching channels or annotation modes. The plot remembers where you were working.</p>
+      </div>
+
+      <h3>Snap to Peak</h3>
+      <p>After placing peaks approximately, you can refine them automatically:</p>
+      <ol>
+        <li>Enter a window size (e.g., 4-10 samples) in the <strong>"Snap peaks"</strong> field</li>
+        <li>Click <strong>"🎯 Adjust"</strong></li>
+        <li>All R, P, T, and U peaks will snap to the local maximum within the window</li>
+      </ol>
+      
+      <div class="warning">
+        <h4>⚠️ Q and S Waves Are Not Snapped</h4>
+        <p>Q and S waves are typically minima or inflection points, so they are <strong>excluded</strong> from the snap function. These must be placed precisely by hand.</p>
+      </div>
+
+      <h3>Undo Annotations</h3>
+      <div class="feature">
+        <h4>↶ Remove Last</h4>
+        <p>Click <strong>"↶ Remove Last"</strong> to undo the most recent peak annotation. This button removes peaks in the reverse order they were added, acting as a simple undo function.</p>
+      </div>
+
+      <h3>Clear All Peaks</h3>
+      <p>Click <strong>"Clear peaks"</strong> to remove all R, P, Q, S, T, and U annotations. A confirmation dialog will appear.</p>
+
+      <h3>Invert ECG</h3>
+      <p>Click <strong>"Invert ECG"</strong> to multiply all signal values by -1. Useful for signals with inverted polarity.</p>
+
+      <div id="beat-classification">
+        <h3>4.1 R-Peak Beat Classification</h3>
+        
+        <p>CardioAnnotate supports comprehensive beat-by-beat R-peak classification following WFDB annotation standards. Each R-peak can be classified into one of 19 different beat types for arrhythmia analysis.</p>
+
+        <h4>How to Classify R-Peaks</h4>
+        
+        <div class="feature">
+          <h4>Method 1: Quick Classify Buttons</h4>
+          <p>After adding an R-peak, use the quick classify buttons for common types:</p>
+          <ul>
+            <li><strong>N</strong> — Normal beat</li>
+            <li><strong>V</strong> — Premature ventricular contraction (PVC)</li>
+            <li><strong>A</strong> — Atrial premature contraction (APC)</li>
+            <li><strong>L</strong> — Left bundle branch block (LBBB)</li>
+            <li><strong>R</strong> — Right bundle branch block (RBBB)</li>
+          </ul>
+          <p>Simply add an R-peak, then click the appropriate quick classify button.</p>
+        </div>
+
+        <div class="feature">
+          <h4>Method 2: Full Classification Panel</h4>
+          <p>Click <strong>"More..."</strong> to access the complete classification panel with all 19 beat types. The panel shows:</p>
+          <ul>
+            <li>Current beat type and sample position</li>
+            <li>Full list of WFDB annotation codes</li>
+            <li>Beat type descriptions</li>
+          </ul>
+        </div>
+
+        <div class="feature">
+          <h4>Method 3: Right-Click Classification</h4>
+          <p>Right-click near any R-peak on the plot to open the classification panel for that specific peak. This is the fastest way to classify previously-added R-peaks.</p>
+        </div>
+
+        <h4>Supported Beat Types</h4>
+        <table class="beat-type-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>N</code></td><td>Normal</td><td>Normal</td><td>Normal beat (default)</td></tr>
+            <tr><td><code>L</code></td><td>LBBB</td><td>Bundle Branch</td><td>Left bundle branch block beat</td></tr>
+            <tr><td><code>R</code></td><td>RBBB</td><td>Bundle Branch</td><td>Right bundle branch block beat</td></tr>
+            <tr><td><code>B</code></td><td>BBB</td><td>Bundle Branch</td><td>Bundle branch block (unspecified)</td></tr>
+            <tr><td><code>A</code></td><td>APC</td><td>Supraventricular</td><td>Atrial premature contraction</td></tr>
+            <tr><td><code>a</code></td><td>Aberr APC</td><td>Supraventricular</td><td>Aberrated atrial premature beat</td></tr>
+            <tr><td><code>J</code></td><td>NPC</td><td>Supraventricular</td><td>Nodal (junctional) premature beat</td></tr>
+            <tr><td><code>S</code></td><td>SVPB</td><td>Supraventricular</td><td>Supraventricular premature beat</td></tr>
+            <tr><td><code>V</code></td><td>PVC</td><td>Ventricular</td><td>Premature ventricular contraction</td></tr>
+            <tr><td><code>r</code></td><td>R-on-T</td><td>Ventricular</td><td>R-on-T premature ventricular contraction</td></tr>
+            <tr><td><code>F</code></td><td>Fusion</td><td>Ventricular</td><td>Fusion of ventricular and normal beat</td></tr>
+            <tr><td><code>E</code></td><td>V Escape</td><td>Ventricular</td><td>Ventricular escape beat</td></tr>
+            <tr><td><code>e</code></td><td>A Escape</td><td>Escape</td><td>Atrial escape beat</td></tr>
+            <tr><td><code>j</code></td><td>N Escape</td><td>Escape</td><td>Nodal (junctional) escape beat</td></tr>
+            <tr><td><code>n</code></td><td>SV Escape</td><td>Escape</td><td>Supraventricular escape beat</td></tr>
+            <tr><td><code>/</code></td><td>Paced</td><td>Paced</td><td>Paced beat</td></tr>
+            <tr><td><code>f</code></td><td>Paced Fus</td><td>Paced</td><td>Fusion of paced and normal beat</td></tr>
+            <tr><td><code>Q</code></td><td>Unknown</td><td>Unknown</td><td>Unclassifiable beat</td></tr>
+            <tr><td><code>?</code></td><td>Learn</td><td>Unknown</td><td>Beat not classified during learning</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Visual Feedback</h4>
+        <p>R-peaks are color-coded by beat type on the plot:</p>
+        <ul>
+          <li><strong style="color:#ef4444">Red</strong> — Normal beats</li>
+          <li><strong style="color:#d97706">Amber</strong> — Bundle branch blocks</li>
+          <li><strong style="color:#10b981">Emerald</strong> — Supraventricular beats</li>
+          <li><strong style="color:#dc2626">Dark Red</strong> — Ventricular beats</li>
+          <li><strong style="color:#8b5cf6">Violet</strong> — Escape beats</li>
+          <li><strong style="color:#6366f1">Indigo</strong> — Paced beats</li>
+          <li><strong style="color:#9ca3af">Gray</strong> — Unknown/unclassified</li>
+        </ul>
+
+        <p>The <strong>R-peaks</strong> badge in the Stats panel shows a breakdown of counts by beat type (e.g., "N:245, V:12, A:3").</p>
+
+        <div class="tip">
+          <h4>💡 Last R-Peak Info</h4>
+          <p>After adding an R-peak, the interface displays "Last: R@[sample] [type]" to help you track your most recent annotation.</p>
+        </div>
+      </div>
+
+      <div id="keyboard-shortcuts">
+        <h3>4.2 Keyboard Shortcuts</h3>
+        
+        <p>Speed up your workflow with keyboard shortcuts for R-peak classification:</p>
+        
+        <table class="beat-type-table">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><kbd>N</kbd></td><td>Classify last R-peak as Normal</td></tr>
+            <tr><td><kbd>V</kbd></td><td>Classify last R-peak as PVC (Ventricular)</td></tr>
+            <tr><td><kbd>A</kbd></td><td>Classify last R-peak as APC (Atrial)</td></tr>
+            <tr><td><kbd>L</kbd></td><td>Classify last R-peak as LBBB</td></tr>
+            <tr><td><kbd>Shift</kbd>+<kbd>R</kbd></td><td>Classify last R-peak as RBBB</td></tr>
+            <tr><td><kbd>J</kbd></td><td>Classify last R-peak as Nodal/Junctional</td></tr>
+            <tr><td><kbd>B</kbd></td><td>Classify last R-peak as Bundle Branch Block</td></tr>
+            <tr><td><kbd>F</kbd></td><td>Classify last R-peak as Fusion</td></tr>
+            <tr><td><kbd>E</kbd></td><td>Classify last R-peak as Ventricular Escape</td></tr>
+            <tr><td><kbd>Q</kbd></td><td>Classify last R-peak as Unknown</td></tr>
+            <tr><td><kbd>S</kbd></td><td>Classify last R-peak as Supraventricular</td></tr>
+          </tbody>
+        </table>
+
+        <div class="tip">
+          <h4>💡 Efficient Workflow</h4>
+          <p>The fastest workflow is:</p>
+          <ol>
+            <li>Set mode to "Add R (Normal)"</li>
+            <li>Click on each R-peak</li>
+            <li>Immediately press a keyboard shortcut to classify (if not normal)</li>
+            <li>Continue to next peak</li>
+          </ol>
+        </div>
+
+        <div class="warning">
+          <h4>⚠️ Keyboard Shortcuts Only Work on Last R-Peak</h4>
+          <p>Keyboard shortcuts classify the most recently added R-peak. To classify older R-peaks, use the right-click method or the "More..." panel.</p>
+        </div>
+      </div>
+
+      <div id="auto-detection">
+        <h3>4.3 Automatic Peak Detection</h3>
+        
+        <p>CardioAnnotate provides two automatic peak detection algorithms that can be used for any peak type:</p>
+        
+        <div class="feature">
+          <h4>Find Peaks (scipy.signal.find_peaks)</h4>
+          <p>A general-purpose peak detection algorithm suitable for all peak types. Configurable parameters:</p>
+          <ul>
+            <li><strong>Polarity:</strong> Detect maxima, minima, or absolute value maxima</li>
+            <li><strong>Min distance (ms):</strong> Minimum distance between consecutive peaks</li>
+            <li><strong>Threshold:</strong> Minimum height for peaks (in signal units)</li>
+            <li><strong>Prominence:</strong> Minimum vertical prominence required</li>
+            <li><strong>Prom window (ms):</strong> Window size for prominence calculation</li>
+          </ul>
+        </div>
+
+        <div class="feature">
+          <h4>Pan-Tompkins Algorithm</h4>
+          <p>A classic QRS detection algorithm optimized for R-peak detection. Parameters:</p>
+          <ul>
+            <li><strong>Band-pass (Hz):</strong> Frequency range for filtering (default 5–15 Hz)</li>
+            <li><strong>MWI (ms):</strong> Moving window integration width</li>
+            <li><strong>Min RR (ms):</strong> Minimum allowed RR interval</li>
+            <li><strong>Thresh k:</strong> Threshold factor (detection threshold = mean + k·std)</li>
+            <li><strong>Refine ± (ms):</strong> Window for refining detected peaks to local maximum</li>
+          </ul>
+        </div>
+
+        <h4>Detection Scope</h4>
+        <ul>
+          <li><strong>Full signal:</strong> Process the entire recording</li>
+          <li><strong>Visible segment:</strong> Process only the current zoom window</li>
+        </ul>
+
+        <h4>Options</h4>
+        <ul>
+          <li><strong>Replace existing (in scope):</strong> If checked, removes existing peaks of the target type before detection</li>
+        </ul>
+
+        <div class="tip">
+          <h4>💡 Save Settings per Peak Type</h4>
+          <p>Click <strong>"💾 Save settings to this peak type"</strong> to remember your detection parameters for each peak type. The tool will remember different settings for R, P, T, etc.</p>
+        </div>
+
+        <div class="tip">
+          <h4>💡 Detection Tips</h4>
+          <ul>
+            <li>For R-peaks, Pan-Tompkins usually works best</li>
+            <li>For P and T waves, use Find Peaks with appropriate polarity and distance settings</li>
+            <li>For Q and S waves, use Find Peaks with "Minima" polarity</li>
+            <li>Run detection on a visible segment first to tune parameters before processing full signal</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="export">
+      <h2>💾 5. Export & Sharing</h2>
+      
+      <h3>Export Annotations (JSON)</h3>
+      <p>Click <strong>"Export annotations (JSON)"</strong> to save all peak annotations in a structured JSON format:</p>
+      <ul>
+        <li>Includes sampling frequency and channel names</li>
+        <li>Preserves R-peak beat type classifications</li>
+        <li>Organized by peak type and channel</li>
+        <li>Can be reloaded later</li>
+      </ul>
+
+      <h3>Export Annotations (CSV)</h3>
+      <p>Click <strong>"Export annotations (CSV)"</strong> for a tabular format with columns:</p>
+      <ul>
+        <li><code>peak_type</code> — R, P, Q, S, T, or U</li>
+        <li><code>channel_index</code> — Zero-indexed channel number</li>
+        <li><code>channel_name</code> — Channel label</li>
+        <li><code>sample_index</code> — Peak location in samples</li>
+        <li><code>time_s</code> — Peak time in seconds</li>
+        <li><code>beat_type</code> — WFDB annotation code (for R-peaks only)</li>
+      </ul>
+
+      <h3>Export ECG Signal (CSV)</h3>
+      <p>Click <strong>"Export ECG (CSV)"</strong> to save the current processed signal with columns:</p>
+      <ul>
+        <li><code>fs</code> — Sampling frequency (repeated in every row)</li>
+        <li><code>time_s</code> — Time in seconds</li>
+        <li>One column per channel with signal values</li>
+      </ul>
+
+      <h3>Export NPZ Bundle</h3>
+      <p>Click <strong>"Export bundle (.npz)"</strong> to save a signal-and-annotation bundle containing:</p>
+      <ul>
+        <li>All current processed signal data</li>
+        <li>Sampling frequency and channel metadata</li>
+        <li>All peak annotations with beat types</li>
+      </ul>
+      <p>This format is useful for exchanging processed signals and annotations in a compact Python-compatible archive. Use full session export when you need exact workspace restoration.</p>
+
+      <h3>Export Full Session</h3>
+      <p>Click the full session export control to save the complete analysis state in <code>.json</code>, <code>.mat</code>, or <code>.npz</code> format. A session contains:</p>
+      <ul>
+        <li>Original and current processed signals for every channel</li>
+        <li>Sampling frequency, channel names, units, and record identifier</li>
+        <li>All annotations, R-peak beat classifications, flagged RR intervals, and GP-corrected RR values</li>
+        <li>Filtering, resampling, detector, SQI, RR quality-control, GP kernel, and GP hyperparameter settings</li>
+        <li>The active channel and current zoom window used for visible-segment analysis</li>
+        <li>A saved snapshot of SQI, HRV, ADF stationarity, and summary statistics</li>
+      </ul>
+
+      <h3>Import Full Session</h3>
+      <p>Click the full session import control and select a <code>.json</code>, <code>.mat</code>, or <code>.npz</code> session file. The importer detects the format automatically, restores the workspace state, and recomputes the SQI, HRV, and stationarity panels so the displayed values reproduce the saved snapshot.</p>
+
+      <div class="feature">
+        <h4>Full Session vs. Other Exports</h4>
+        <p>Annotation JSON/CSV files store peak labels only. NPZ signal bundles store processed signals and annotations. Full sessions store the complete processing pipeline, interface state, correction state, visible segment, and computed analysis results.</p>
+      </div>
+
+      <h3>Load Previous Annotations</h3>
+      <p>You can reload previously exported annotations or import compatible WFDB annotation files:</p>
+      <ol>
+        <li>For JSON or CSV annotations, click <strong>"📂 Load JSON/CSV"</strong> and select the annotation file</li>
+        <li>For WFDB annotations, use the <strong>"Import WFDB annotations"</strong> row, select the annotation file, then click <strong>"📂 Load .atr / wave"</strong></li>
+        <li>Annotations will be merged with current peaks (duplicates may occur)</li>
+        <li>R-peak beat type information is preserved when loading JSON or <code>.atr</code> annotation files</li>
+      </ol>
+      <p>JSON imports accept the current <code>annotations</code> top-level key and the legacy <code>peaks</code> key. WFDB imports accept <code>.atr</code>, <code>.qrs</code>, <code>.pwave</code>, <code>.twave</code>, <code>.uwave</code>, <code>.qwave</code>, <code>.swave</code>, and recognized extension variants. The WFDB file picker accepts all extensions so that non-standard annotation files remain selectable.</p>
+      
+      <h3>Export to WFDB Format</h3>
+      <p>Save the current signal and annotations as WFDB files with <strong>enhanced export options</strong>:</p>
+      
+      <ol>
+        <li>Enter a record name (default is "export")</li>
+        <li>Choose an annotation format:
+          <ul>
+            <li><strong>All peaks in one file (.atr)</strong> — Single annotation file containing all peak types with WFDB codes</li>
+            <li><strong>Separate files</strong> — Creates individual annotation files:
+              <ul>
+                <li><code>.atr</code> — R-peaks with beat type annotations</li>
+                <li><code>.pwave</code> — P-peaks</li>
+                <li><code>.twave</code> — T-peaks</li>
+                <li><code>.uwave</code> — U-waves</li>
+                <li><code>.qwave</code> — Q-waves</li>
+                <li><code>.swave</code> — S-waves</li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+        <li>Click <strong>"Export WFDB (.hea/.dat + annotations)"</strong></li>
+        <li>Files will be downloaded:
+          <ul>
+            <li><code>.hea</code> — Header with metadata</li>
+            <li><code>.dat</code> — Signal data (16-bit signed, gain 200)</li>
+            <li>Annotation file(s) based on your selection</li>
+          </ul>
+        </li>
+      </ol>
+
+      <div class="feature">
+        <h4>WFDB Annotation Mapping</h4>
+        <p>When using the "All peaks in one file" mode, peak types are mapped to WFDB annotation codes:</p>
+        <ul>
+          <li><strong>R-peaks</strong> → Use their assigned beat type code (N, V, A, L, etc.)</li>
+          <li><strong>P-peaks</strong> → <code>p</code> (P-wave peak)</li>
+          <li><strong>T-peaks</strong> → <code>t</code> (T-wave peak)</li>
+          <li><strong>U-waves</strong> → <code>u</code> (U-wave)</li>
+          <li><strong>Q-waves</strong> → <code>(</code> (waveform onset)</li>
+          <li><strong>S-waves</strong> → <code>)</code> (waveform end)</li>
+        </ul>
+      </div>
+      
+      <div class="tip">
+        <h4>💡 Choosing Between Export Modes</h4>
+        <p><strong>Single file mode</strong> is best for standard WFDB compatibility and when you need all annotations in one place. <strong>Separate files mode</strong> is useful when different peak types need independent processing or when working with tools that expect specific annotation file extensions.</p>
+      </div>
+
+      <div class="tip">
+        <h4>💡 Export Summary</h4>
+        <p>After exporting, a status message shows which files were created and the count of each peak type (e.g., "✓ Exported: record.hea, record.dat, record.atr (245 R, 38 P, 41 T)").</p>
+      </div>
+    </section>
+
+    <section id="processing">
+      <h2>🔧 6. Signal Processing</h2>
+      
+      <h3>Resampling</h3>
+      <p>Change the sampling frequency of your signal:</p>
+      <ol>
+        <li>Enter the target sampling frequency in Hz</li>
+        <li>Click <strong>"Resample"</strong></li>
+        <li>The signal will be resampled using <code>scipy.signal.resample_poly</code></li>
+        <li>If you have annotations, you'll be warned that they need to be reprojected</li>
+      </ol>
+      
+      <div class="warning">
+        <h4>⚠️ Important: Reproject Annotations After Resampling</h4>
+        <p>After resampling, your peak annotations will be at incorrect positions. Click <strong>"Reproject annotations to new fs"</strong> to automatically scale them to the new sampling rate.</p>
+      </div>
+      
+      <h3>Filtering</h3>
+      <p>Apply Butterworth filters (order 4, zero-phase using <code>filtfilt</code>):</p>
+      
+      <div class="feature">
+        <h4>Low-Pass Filter</h4>
+        <p>Remove high-frequency noise. Enter cutoff frequency in Hz (e.g., 40 Hz).</p>
+      </div>
+      
+      <div class="feature">
+        <h4>High-Pass Filter</h4>
+        <p>Remove baseline wander and low-frequency drift. Enter cutoff frequency in Hz (e.g., 0.5 Hz).</p>
+      </div>
+      
+      <div class="feature">
+        <h4>Notch Filter</h4>
+        <p>Remove powerline interference at 50 Hz or 60 Hz. Select from dropdown (Q=30).</p>
+      </div>
+      
+      <div class="feature">
+        <h4>Band-Pass Filter</h4>
+        <p>Convenience shortcut that applies high-pass and low-pass in one step. Enter low and high cutoff frequencies.</p>
+      </div>
+      
+      <div class="tip">
+        <h4>💡 Typical ECG Filter Settings</h4>
+        <p>Common band-pass: 0.5 Hz (high-pass) to 40 Hz (low-pass). This removes baseline drift while preserving ECG morphology.</p>
+      </div>
+      
+      <h3>Reset to Original</h3>
+      <p>Click <strong>"↺ Reset all signals"</strong> to discard all signal processing (resampling, filtering, inversion) and return to the originally loaded signal.</p>
+      
+      <div class="warning">
+        <h4>⚠️ Filter Order Matters</h4>
+        <p>If you plan to both resample and filter, <strong>resample first, then filter</strong>. Filters are designed for specific sampling rates.</p>
+      </div>
+    </section>
+
+    <section id="statistics">
+      <h2>📊 7. Statistics & Analysis</h2>
+      
+      <div id="basic-stats">
+        <h3>7.1 Basic ECG Metrics</h3>
+        
+        <p>The Statistics panel automatically computes common ECG metrics based on your peak annotations:</p>
+        
+        <h4>Available Metrics</h4>
+        <ul>
+          <li><strong>Duration:</strong> Total signal length in seconds</li>
+          <li><strong>Avg RR (ms):</strong> Average R-R interval duration (time between consecutive R-peaks)</li>
+          <li><strong>HR (bpm):</strong> Heart rate calculated from average RR interval (60000 / RR_ms)</li>
+          <li><strong>Avg PR (ms):</strong> Average P-R interval (from P-peak to next R-peak)</li>
+          <li><strong>Avg QT (ms):</strong> Average Q-T interval (from Q-wave to T-peak, or R-peak to T-peak if no Q annotations)</li>
+          <li><strong>Avg QRS (ms):</strong> Average QRS duration (from Q-wave to S-wave if both are annotated, otherwise estimated from R-peak to S-wave)</li>
+        </ul>
+        
+        <div class="tip">
+          <h4>💡 Statistical Note</h4>
+          <p>All interval statistics require at least 2 peaks of the relevant types. Metrics will show "—" if insufficient data is available.</p>
+        </div>
+        
+        <h4>Badge Counters</h4>
+        <p>The colored badges show total peak counts across all channels:</p>
+        <ul>
+          <li><strong>Signal:</strong> Current processing state (original, resampled, filtered, modified)</li>
+          <li><strong>R-peaks:</strong> Total R-peaks with breakdown by beat type (e.g., "N:245, V:12, A:3")</li>
+          <li><strong>P-peaks:</strong> Total P-peaks</li>
+          <li><strong>Q-waves:</strong> Total Q-waves</li>
+          <li><strong>S-waves:</strong> Total S-waves</li>
+          <li><strong>T-peaks:</strong> Total T-peaks</li>
+          <li><strong>U-waves:</strong> Total U-waves</li>
+        </ul>
+
+        <div class="feature">
+          <h4>R-Peak Breakdown</h4>
+          <p>The R-peaks badge includes a detailed breakdown showing the count of each beat type, making it easy to see the distribution of normal beats versus arrhythmias at a glance.</p>
+        </div>
+      </div>
+
+      <div id="sqi">
+        <h3>7.2 Signal Quality Indices (SQI)</h3>
+        
+        <p>Signal quality metrics help assess the reliability of the ECG signal for analysis. These are computed on the <strong>currently visible window</strong> of the active channel.</p>
+        
+        <table class="beat-type-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Formula</th>
+              <th>Description</th>
+              <th>Interpretation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>pSQI</strong></td>
+              <td>Power(5–15 Hz) / Power(5–40 Hz)</td>
+              <td>QRS-band relative power</td>
+              <td>Higher values (0.3–0.7) indicate stronger QRS complexes relative to other content</td>
+            </tr>
+            <tr>
+              <td><strong>kSQI</strong></td>
+              <td>Pearson kurtosis</td>
+              <td>Signal "peakiness"</td>
+              <td>Gaussian ≈ 3; higher values indicate prominent QRS spikes; low values suggest noise</td>
+            </tr>
+            <tr>
+              <td><strong>basSQI</strong></td>
+              <td>1 − Power(0–1 Hz) / Power(0–40 Hz)</td>
+              <td>Baseline wander index</td>
+              <td>Higher is better (close to 1); low values indicate significant baseline drift</td>
+            </tr>
+            <tr>
+              <td><strong>lineSQI</strong></td>
+              <td>Power(mains ± width) / Power(0–Nyquist)</td>
+              <td>Mains interference ratio</td>
+              <td>Lower is better; high values indicate powerline contamination at 50/60 Hz</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="tip">
+          <h4>💡 Mains Frequency Settings</h4>
+          <p>Adjust the <strong>Mains</strong> dropdown (50 Hz for Europe/Asia or 60 Hz for Americas) and <strong>±</strong> bandwidth (0.5 to 2 Hz) to match your region's power grid for accurate lineSQI calculation.</p>
+        </div>
+      </div>
+
+      <div id="hrv">
+        <h3>7.3 Heart Rate Variability (HRV)</h3>
+        
+        <p>HRV metrics are computed from R-peaks within the <strong>current zoom window</strong>. The segment range is displayed (e.g., "Segment: 0.0–10.5s").</p>
+        
+        <h4>Time-Domain Metrics</h4>
+        <table class="beat-type-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Description</th>
+              <th>Clinical Significance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Mean NN / RR (ms)</strong></td>
+              <td>Average of all NN (RR) intervals</td>
+              <td>Inversely related to heart rate</td>
+            </tr>
+            <tr>
+              <td><strong>SDNN (ms)</strong></td>
+              <td>Standard deviation of NN intervals</td>
+              <td>Overall HRV; reflects all cyclic components</td>
+            </tr>
+            <tr>
+              <td><strong>RMSSD (ms)</strong></td>
+              <td>Root mean square of successive differences</td>
+              <td>Short-term variability; parasympathetic activity</td>
+            </tr>
+            <tr>
+              <td><strong>NN50</strong></td>
+              <td>Count of successive NN intervals differing by &gt;50 ms</td>
+              <td>Parasympathetic indicator</td>
+            </tr>
+            <tr>
+              <td><strong>pNN50 (%)</strong></td>
+              <td>NN50 as percentage of total NN intervals</td>
+              <td>Normalized parasympathetic indicator</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4>Frequency-Domain Metrics</h4>
+        <p>Computed using Welch's method (Hann window, 50% overlap):</p>
+        <table class="beat-type-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Frequency Band</th>
+              <th>Physiological Interpretation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>ULF power (ms²)</strong></td>
+              <td>0–0.003 Hz</td>
+              <td>Ultra low frequency; circadian rhythms, thermoregulation</td>
+            </tr>
+            <tr>
+              <td><strong>VLF power (ms²)</strong></td>
+              <td>0.003–0.04 Hz</td>
+              <td>Very low frequency; thermoregulation, hormonal fluctuations</td>
+            </tr>
+            <tr>
+              <td><strong>LF power (ms²)</strong></td>
+              <td>0.04–0.15 Hz</td>
+              <td>Low frequency; mix of sympathetic and parasympathetic</td>
+            </tr>
+            <tr>
+              <td><strong>HF power (ms²)</strong></td>
+              <td>0.15–0.4 Hz</td>
+              <td>High frequency; parasympathetic (vagal) activity, respiratory sinus arrhythmia</td>
+            </tr>
+            <tr>
+              <td><strong>LF/HF ratio</strong></td>
+              <td>—</td>
+              <td>Sympathovagal balance (interpretation debated)</td>
+            </tr>
+          </tbody>
+        </table>
+
+      <h4>Nonlinear Metrics</h4>
+        <p>Derived from the Poincaré plot of successive NN intervals (RR<sub>n</sub> versus RR<sub>n+1</sub>) and from the sample entropy of the NN series. A Poincaré plot can be opened in a separate window using the <strong>Poincaré plot</strong> button; the SD1/SD2 dispersion ellipse, centered at the mean NN, is overlaid on the scatter.</p>
+        <table class="beat-type-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Description</th>
+              <th>Interpretation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Poincaré SD1 (ms)</strong></td>
+              <td>Dispersion perpendicular to the line of identity (SD1 = SDSD/√2, where SDSD is the standard deviation of successive NN differences)</td>
+              <td>Short-term variability; closely tracks RMSSD and reflects parasympathetic (vagal) activity</td>
+            </tr>
+            <tr>
+              <td><strong>Poincaré SD2 (ms)</strong></td>
+              <td>Dispersion along the line of identity (SD2 = √(2·SDNN² − ½·SDSD²))</td>
+              <td>Long-term variability; reflects overall HRV and satisfies SD1² + SD2² = 2·SDNN²</td>
+            </tr>
+            <tr>
+              <td><strong>SD2/SD1</strong></td>
+              <td>Ratio of long-term to short-term variability</td>
+              <td>Balance between long- and short-term variability; higher values indicate greater long-term dispersion relative to beat-to-beat variability</td>
+            </tr>
+            <tr>
+              <td><strong>SampEn</strong></td>
+              <td>Sample entropy of the NN series (embedding dimension m = 2, tolerance r = 0.2 × SDNN)</td>
+              <td>Regularity and complexity of the RR series; lower values indicate more regular, predictable rhythms, higher values indicate more complex or irregular dynamics</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4>Stationarity (ADF Test)</h4>
+        <p>The Augmented Dickey-Fuller test assesses whether the RR interval series is stationary:</p>
+        <ul>
+          <li><strong style="color:#10b981">Stationary (p &lt; 0.05)</strong> — RR intervals show stable statistical properties; HRV metrics are reliable</li>
+          <li><strong style="color:#ef4444">Non-stationary</strong> — RR intervals show trends or drifts; interpret HRV metrics with caution</li>
+        </ul>
+
+        <div class="warning">
+          <h4>⚠️ HRV Requirements</h4>
+          <p>Time-domain HRV requires ≥2 R-peaks (to compute at least one RR interval). Frequency-domain HRV requires ≥4 RR intervals for reliable spectral estimation. <br>Nonlinear metrics require ≥3 NN intervals for the Poincaré descriptors; SampEn requires at least m+2 intervals and is reported as "—" when no matching templates exist at the chosen tolerance, so it is most reliable on longer segments with many intervals.</p>
+
+        </div>
+      </div>
+
+      <div id="rr-correction">
+        <h3>7.4 RR Error Detection & GP Correction</h3>
+        
+        <p>CardioAnnotate includes advanced RR interval quality control using Gaussian Process (GP) regression for detecting and correcting outliers. This is essential for reliable HRV analysis.</p>
+
+        <h4>Detection Modes</h4>
+        <table class="beat-type-table">
+          <thead>
+            <tr>
+              <th>Mode</th>
+              <th>Description</th>
+              <th>Parameters</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Absolute bounds</strong></td>
+              <td>Flag RR intervals outside physiological limits</td>
+              <td><strong>Abs min RR:</strong> Minimum (default 250 ms)<br><strong>Abs max RR:</strong> Maximum (default 2000 ms)</td>
+            </tr>
+            <tr>
+              <td><strong>Rate-of-change bounds</strong></td>
+              <td>Flag intervals with excessive beat-to-beat variation</td>
+              <td><strong>Max rel change α:</strong> Maximum relative change (default 0.20 = 20%)</td>
+            </tr>
+            <tr>
+              <td><strong>Both</strong></td>
+              <td>Combine absolute and rate-of-change criteria</td>
+              <td>Both sets of parameters apply</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="feature">
+          <h4>Compare to last accepted</h4>
+          <p>When enabled (default), rate-of-change detection compares each interval to the last <em>accepted</em> value rather than the immediate predecessor. This prevents cascading rejections from a single outlier.</p>
+        </div>
+
+        <h4>Gaussian Process Kernels</h4>
+        <p>Choose a GP kernel for RR interval interpolation:</p>
+        <ul>
+          <li><strong>Rational Quadratic (RQ)</strong> — Default; flexible, handles multiple length scales. Best general-purpose choice.</li>
+          <li><strong>Matérn 3/2</strong> — Once-differentiable, allows rougher variations</li>
+          <li><strong>Matérn 5/2</strong> — Twice-differentiable, smoother than 3/2</li>
+          <li><strong>Periodic</strong> — For regular heartbeat patterns with periodic structure</li>
+          <li><strong>Brownian</strong> — For trending RR series (non-stationary)</li>
+        </ul>
+
+        <h4>Default GP Hyperparameters</h4>
+        <p>Kernel defaults use optimized mean values from the Harmonizing Heartbeats RR-correction model. Each kernel applies its variance term, <code>σ²</code>, as a scale factor.</p>
+        <table class="beat-type-table">
+          <thead>
+            <tr><th>Kernel</th><th>Default Hyperparameters</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Rational Quadratic (RQ)</strong></td><td><code>ℓ=0.475</code>, <code>α=0.412</code>, <code>σ²=3.06×10⁻⁴</code></td></tr>
+            <tr><td><strong>Matérn 3/2</strong></td><td><code>ℓ=2.65</code>, <code>σ²=54.93</code></td></tr>
+            <tr><td><strong>Matérn 5/2</strong></td><td><code>ℓ=0.241</code>, <code>σ²=29.40</code></td></tr>
+            <tr><td><strong>Periodic</strong></td><td><code>period=0.784</code>, <code>ℓ=0.985</code>, <code>σ²=2.90</code></td></tr>
+            <tr><td><strong>Brownian</strong></td><td><code>σ²=0.0010</code></td></tr>
+          </tbody>
+        </table>
+
+        <div class="feature">
+          <h4>GP Hyperparameters Panel</h4>
+          <p>Click <strong>"GP hyperparameters ▾"</strong> below the GP controls to open the collapsible hyperparameter panel. The visible sliders change with the selected kernel, each slider shows its current value, and GP correction uses the current slider values each time it runs.</p>
+        </div>
+
+        <h4>Workflow</h4>
+        <ol>
+          <li>Configure detection parameters (min/max RR, max change α)</li>
+          <li>Select a GP kernel and adjust the <strong>GP hyperparameters</strong> sliders if needed</li>
+          <li>Click <strong>"🧪 Detect RR outliers"</strong> to flag implausible intervals</li>
+          <li>Review the flagged count in the display</li>
+          <li>Click <strong>"✨ GP-correct flagged RR"</strong> to estimate corrected values using GP regression</li>
+          <li>Optionally click <strong>"🗑 Remove flagged RR"</strong> to delete the R-peaks associated with flagged intervals</li>
+        </ol>
+
+        <div class="warning">
+          <h4>⚠️ GP Correction Requirements</h4>
+          <p>GP correction requires at least 3 accepted (non-flagged) RR intervals to train the model, and at least 1 flagged interval to correct. If correction fails, try adjusting thresholds or using a different kernel.</p>
+        </div>
+
+        <div class="tip">
+          <h4>💡 When to Use GP Correction</h4>
+          <p>Run RR outlier detection and GP correction <strong>before</strong> computing HRV metrics. This removes or corrects ectopic beats, missed beats, and artifacts that would otherwise distort HRV estimates.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="dark-mode">
+      <h2>🌙 8. Dark Mode</h2>
+      
+      <p>CardioAnnotate supports both light and dark themes for comfortable viewing in any environment.</p>
+      
+      <div class="feature">
+        <h4>Toggle Theme</h4>
+        <p>Click the <strong>"🌙 Dark"</strong> / <strong>"☀️ Light"</strong> button in the header to switch between themes. Your preference is saved in the browser's local storage and will be remembered for future sessions.</p>
+      </div>
+
+      <div class="tip">
+        <h4>💡 Reduced Eye Strain</h4>
+        <p>Dark mode is recommended for extended annotation sessions, especially in low-light environments. The plot colors, UI elements, and contrast levels are optimized for visibility in both themes.</p>
+      </div>
+    </section>
+
+    <section id="tips">
+      <h2>💡 9. Tips & Best Practices</h2>
+      
+      <div class="tip">
+        <h4>1. Work at the Right Zoom Level</h4>
+        <p>Zoom in to 2-3 heartbeats for optimal annotation precision. You can see the overall morphology while placing peaks accurately.</p>
+      </div>
+      
+      <div class="tip">
+        <h4>2. Annotate R-peaks First, Then Classify</h4>
+        <p>The most efficient workflow is to add all R-peaks first with the default "Normal" type, then use keyboard shortcuts or quick classify buttons to mark arrhythmias as you go. For complex cases, right-click on R-peaks to access the full classification panel.</p>
+      </div>
+      
+      <div class="tip">
+        <h4>3. Use Snap-to-Peak for Refinement</h4>
+        <p>Place approximate peaks quickly, then use the snap function with a small window (3-5 samples) to refine them automatically. This works best for R, P, T, and U peaks.</p>
+      </div>
+      
+      <div class="tip">
+        <h4>4. Save Your Work Frequently</h4>
+        <p>Export annotations to JSON or a signal bundle to preserve peak labels. Use full session export when you need to preserve the complete workspace, including the original and processed signals, settings, corrections, selected window, and computed results. Since everything runs in-browser, refreshing the page will lose all unsaved work.</p>
+      </div>
+      
+      <div class="tip">
+        <h4>5. Process Then Annotate</h4>
+        <p>Apply necessary filtering and resampling <strong>before</strong> annotating. It's easier to see features in clean, properly-sampled signals.</p>
+      </div>
+      
+      <div class="tip">
+        <h4>6. Multi-Lead Consistency</h4>
+        <p>For multi-lead ECGs, annotate the clearest lead first (often MLII), then use those annotations as a temporal reference for other leads.</p>
+      </div>
+      
+      <div class="tip">
+        <h4>7. Q and S Wave Annotation</h4>
+        <p>Q and S waves require precise manual placement since they're often minima or inflection points. They are automatically excluded from the "snap to peak" function. For accurate QRS measurements, annotate both Q and S waves.</p>
+      </div>
+
+      <div class="tip">
+        <h4>8. Use "Remove Last" for Quick Corrections</h4>
+        <p>If you make a mistake while annotating, use the "↶ Remove Last" button to undo the most recent annotation. This is faster than switching to "Remove nearest" mode.</p>
+      </div>
+
+      <div class="tip">
+        <h4>9. Choose the Right WFDB Export Mode</h4>
+        <p>For general-purpose exports and maximum compatibility, use the single file mode. Use separate files mode when you need to process different peak types independently or when working with specialized WFDB tools.</p>
+      </div>
+
+      <div class="tip">
+        <h4>10. Use GP Correction Before HRV Analysis</h4>
+        <p>Before computing HRV metrics, run RR outlier detection and GP correction to remove or correct ectopic beats and artifacts. This ensures more reliable HRV estimates.</p>
+      </div>
+
+      <div class="tip">
+        <h4>11. Check Signal Quality First</h4>
+        <p>Review the SQI metrics before detailed annotation. Poor signal quality (low pSQI, high lineSQI) may require filtering or indicate a segment unsuitable for analysis.</p>
+      </div>
+
+      <div class="tip">
+        <h4>12. Use Full Sessions for Reproducibility</h4>
+        <p>When sharing an analysis with collaborators or preparing work for review, export a full session rather than only annotations. The session records the visible segment, detector parameters, GP correction state, and computed SQI, HRV, and ADF results needed to reproduce the workspace.</p>
+      </div>
+    </section>
+
+    <section id="troubleshooting">
+      <h2>🔧 10. Troubleshooting</h2>
+      
+      <h3>Common Issues</h3>
+      
+      <div class="feature">
+        <h4>Issue: "Initializing..." never completes</h4>
+        <p><strong>Solution:</strong> Check your internet connection. Pyodide and WFDB need to download (~20MB) on first load. Try refreshing the page or clearing your browser cache.</p>
+      </div>
+      
+      <div class="feature">
+        <h4>Issue: "Failed to load" WFDB files</h4>
+        <p><strong>Solution:</strong> Ensure you have both .hea and .dat (or .mat) files with the same basename. Check that the files aren't corrupted. Try the files with standard WFDB tools first.</p>
+      </div>
+      
+      <div class="feature">
+        <h4>Issue: Annotations disappear after resampling</h4>
+        <p><strong>Solution:</strong> This is expected behavior. Use the <strong>"Reproject annotations to new fs"</strong> button to scale peak positions to the new sampling rate.</p>
+      </div>
+      
+      <div class="feature">
+        <h4>Issue: CSV import fails</h4>
+        <p><strong>Solution:</strong> Verify your CSV has:
+          <ul>
+            <li>A header row with <code>fs</code> or <code>sampling_rate</code> column</li>
+            <li>Channel columns with recognizable names</li>
+            <li>Numeric values in all data rows</li>
+            <li>No missing values</li>
+          </ul>
+        </p>
+      </div>
+      
+      <div class="feature">
+        <h4>Issue: Filter causes error</h4>
+        <p><strong>Solution:</strong> Make sure cutoff frequencies are below the Nyquist frequency (sampling_rate / 2). Very low or very high cutoffs can cause numerical issues.</p>
+      </div>
+      
+      <div class="feature">
+        <h4>Issue: Peaks not visible on plot</h4>
+        <p><strong>Solution:</strong> Zoom out to see the full signal range. Annotations are only visible when the corresponding samples are in the current view window.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: Beat classification not working</h4>
+        <p><strong>Solution:</strong> Beat classification only works for R-peaks. Make sure you're in "Add R (Normal)" mode or have recently added an R-peak. Keyboard shortcuts only classify the most recently added R-peak.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: WFDB annotation file is not visible in the file picker</h4>
+        <p><strong>Solution:</strong> The WFDB annotation importer accepts all file extensions. Choose the file directly, or switch the operating system file picker to show all files, then select the desired <code>.atr</code>, <code>.qrs</code>, <code>.pwave</code>, <code>.twave</code>, <code>.uwave</code>, <code>.qwave</code>, or <code>.swave</code> annotation file.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: WFDB export creates unexpected files</h4>
+        <p><strong>Solution:</strong> Check your selected export mode (single file vs. separate files). The "single file" mode creates one .atr file, while "separate files" mode creates multiple annotation files (.atr, .pwave, .twave, etc.) depending on which peak types you've annotated.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: GP correction fails or returns poor results</h4>
+        <p><strong>Solution:</strong> GP correction requires at least 3 accepted (non-flagged) RR intervals. Try adjusting the detection thresholds to flag fewer intervals, or try a different kernel (RQ is usually most robust).</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: HRV metrics show "—"</h4>
+        <p><strong>Solution:</strong> HRV requires R-peaks in the visible segment. Time-domain metrics need ≥2 R-peaks; frequency-domain metrics need ≥4 RR intervals. Zoom to include more heartbeats.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: NPZ import fails</h4>
+        <p><strong>Solution:</strong> Ensure the NPZ file was exported from CardioAnnotate and contains both "signals" and "meta" arrays. Files from other sources may not be compatible.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: Full session import does not restore the expected workspace</h4>
+        <p><strong>Solution:</strong> Confirm that the file is a CardioAnnotate full session rather than an annotation-only JSON/CSV file or a signal bundle. Full sessions include signals, annotations, corrections, settings, view state, and results. If the visible segment differs after import, check that the saved session contained the expected zoom window and active channel.</p>
+      </div>
+      
+      <h3>Performance Tips</h3>
+      <ul>
+        <li><strong>Large Files:</strong> For signals >1 million samples, operations may take several seconds. Be patient and watch the console log for progress.</li>
+        <li><strong>Browser Choice:</strong> Chrome/Edge typically perform best. Firefox and Safari also work but may be slower for very large signals.</li>
+        <li><strong>Memory:</strong> Very large multi-channel recordings may exceed browser memory limits (typically ~2GB). Consider downsampling or processing channels separately.</li>
+      </ul>
+    </section>
+
+    <section id="citation">
+      <h2>📝 11. Citation & Credits</h2>
+      <p>If you use CardioAnnotate in your research or clinical work, please cite:</p>
+      
+      <div class="feature">
+        <h4>CardioAnnotate: A Toolkit for ECG Peak Labeling and Processing</h4>
+        <p>A browser-based ECG annotation toolkit with integrated signal processing, R-peak beat classification, HRV analysis, and WFDB format support.</p>
+        <button class="copy-btn" onclick="showBibtexModal('cardioannotate')" style="margin-top:8px">📋 Copy BibTeX</button>
+      </div>
+
+      <div class="feature">
+        <h4>Harmonizing heartbeats: RR-interval correction with Gaussian Process for reliable HRV</h4>
+        <p>Mojtahed, Hamed, et al. (2026). Biomedical Signal Processing and Control, 117, 109513. Elsevier.</p>
+        <p style="margin-top:8px;font-style:italic;font-size:13px">If you use the RR error detection and Gaussian Process correction features, please also cite this work.</p>
+        <button class="copy-btn" onclick="showBibtexModal('harmonizing')" style="margin-top:8px">📋 Copy BibTeX</button>
+      </div>
+      
+      <h3>Technical Details</h3>
+      <ul>
+        <li><strong>Implementation:</strong> JavaScript + Pyodide (Python 3.11 in WebAssembly)</li>
+        <li><strong>Dependencies:</strong> WFDB-Python, NumPy, SciPy, Plotly.js</li>
+        <li><strong>Signal Processing:</strong> Butterworth filters (order 4), zero-phase filtering (filtfilt), polyphase resampling</li>
+        <li><strong>Visualization:</strong> Plotly.js for interactive plotting with color-coded beat types</li>
+        <li><strong>Privacy:</strong> 100% client-side processing, no server uploads</li>
+        <li><strong>Beat Classification:</strong> 19 WFDB annotation codes following PhysioNet standards</li>
+        <li><strong>HRV Analysis:</strong> Time-domain (SDNN, RMSSD, pNN50), frequency-domain (ULF, VLF, LF, HF) with Welch's PSD, and nonlinear (Poincaré SD1/SD2/SD2:SD1, sample entropy) metrics</li>
+        <li><strong>RR Correction:</strong> Gaussian Process regression with multiple kernel options (RQ, Matérn, Periodic, Brownian) and adjustable optimized hyperparameters</li>
+        <li><strong>Session Management:</strong> Full-state export and import in JSON, MAT, and NPZ containers for reproducible analysis restoration</li>
+      </ul>
+      <h3>Acknowledgments</h3>
+      <p>This toolkit builds upon the excellent work of:</p>
+      <ul>
+        <li><strong>WFDB Software Package</strong> - Physiological signal processing standards and annotation codes</li>
+        <li><strong>PhysioNet</strong> - ECG databases and research resources</li>
+        <li><strong>Pyodide Project</strong> - Python in the browser</li>
+        <li><strong>SciPy</strong> - Scientific computing in Python</li>
+      </ul>
+    </section>
+
+    <div style="text-align:center; margin-top:48px;">
+      <button type="button" class="back-link" onclick="window.close();">
+        ← Return to CardioAnnotate Tool
+      </button>    
+    </div>
+  </div>
+
+  <footer>
+    <p><strong>CardioAnnotate</strong> - A Toolkit for ECG Peak Labeling and Processing</p>
+    <p><button class="version-link" onclick="showChangelogModal()">Version 0.1.0</button> | 100% Client-Side Processing | Privacy-Preserving | Open Standards | WFDB Compatible</p>
+  </footer>
+
+  <!-- Changelog Modal -->
+  <div id="changelogModal" class="modal-overlay" onclick="if(event.target===this)closeChangelogModal()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Version History</h3>
+        <button class="modal-close" onclick="closeChangelogModal()">×</button>
+      </div>
+      <ul class="changelog-list">
+        <li><strong>Initial Releas.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- BibTeX Modal -->
+  <div id="bibtexModal" class="modal-overlay" onclick="if(event.target===this)closeBibtexModal()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>📋 BibTeX Citation</h3>
+        <button class="modal-close" onclick="closeBibtexModal()">×</button>
+      </div>
+      <div id="bibtexContent"></div>
+    </div>
+  </div>
+
+  <script>
+    function showChangelogModal() {
+      document.getElementById('changelogModal').classList.add('show');
+    }
+
+    function closeChangelogModal() {
+      document.getElementById('changelogModal').classList.remove('show');
+    }
+
+    const bibtexEntries = {
+      cardioannotate: `@software{cardioannotate,
+  title={CardioAnnotate: A Toolkit for ECG Peak Labeling and Processing},
+  author={},
+  year={2026},
+  note={Browser-based ECG annotation toolkit with integrated signal processing, R-peak beat classification, HRV analysis, and WFDB format support},
+  url={}
+}`,
+      harmonizing: `@article{mojtahed2026harmonizing,
+  title={Harmonizing heartbeats: RR-interval correction with Gaussian Process for reliable HRV},
+  author={Mojtahed, Hamed and Rao, Ramesh R and Paolini, Christopher and Sarkar, Mahasweta},
+  journal={Biomedical Signal Processing and Control},
+  volume={117},
+  pages={109513},
+  year={2026},
+  issn = {1746-8094},
+  doi = {https://doi.org/10.1016/j.bspc.2026.109513},
+  publisher={Elsevier}
+}`
+    };
+
+    function showBibtexModal(key) {
+      const modal = document.getElementById('bibtexModal');
+      const content = document.getElementById('bibtexContent');
+      const bibtex = bibtexEntries[key];
+      
+      content.innerHTML = `
+        <div class="bibtex-box">
+          <button class="copy-btn" onclick="copyBibtex('${key}', this)" style="position:absolute;top:8px;right:8px">📋 Copy</button>
+          <pre style="margin:0;white-space:pre-wrap;">${bibtex}</pre>
+        </div>
+      `;
+      
+      modal.classList.add('show');
+    }
+
+    function closeBibtexModal() {
+      document.getElementById('bibtexModal').classList.remove('show');
+    }
+
+    function copyBibtex(key, btn) {
+      const bibtex = bibtexEntries[key];
+      navigator.clipboard.writeText(bibtex).then(() => {
+        btn.textContent = '✓ Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = '📋 Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(() => {
+        // Fallback
+        const textarea = document.createElement('textarea');
+        textarea.value = bibtex;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        btn.textContent = '✓ Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = '📋 Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeBibtexModal();
+        closeChangelogModal();
+      }
+    });
+  </script>
+</body>
+</html>
