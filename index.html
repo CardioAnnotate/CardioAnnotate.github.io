@@ -270,6 +270,70 @@
   #changelogBox .cl-body .tag.pre{ background:#78350f; color:#fde68a; }
   #btnCloseChangelog{ background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; line-height:1; padding:0 2px; }
 
+
+  /* Layout repairs and responsive spacing */
+  .grid > *, .card .body, .row > * { min-width:0; }
+  .snap-controls{
+    margin-bottom:8px;
+    padding-bottom:8px;
+    border-bottom:1px solid var(--border);
+  }
+  .peak-detection-panel{
+    width:100%;
+    margin:10px 0 8px;
+    padding:12px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    background:var(--panel2);
+  }
+  .peak-detection-panel > .row,
+  .peak-detection-panel [id^="detParams"] .row{
+    row-gap:10px;
+  }
+  .rr-review-box{
+    margin-top:12px;
+    padding:12px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:var(--panel2);
+  }
+  .rr-review-box .rrqc-grid > div{ min-width:0; }
+  .rr-review-box input[type="number"],
+  .rr-review-box select{ max-width:100%; }
+  #rrModalBox{ box-shadow:0 20px 60px rgba(0,0,0,.28); }
+  #rrModalBody{ overflow-wrap:anywhere; }
+
+  @media (max-width: 980px){
+    .grid{ grid-template-columns:1fr; }
+    .rrqc-header{ display:block; }
+    .rrqc-controls{ margin-top:10px; }
+    .mini-grid{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+  }
+
+  @media (max-width: 640px){
+    header{ flex-wrap:wrap; padding:14px 12px; }
+    header .spacer{ display:none; }
+    .citation-box, .container{ padding-left:10px; padding-right:10px; }
+    .card .body{ padding:12px; }
+    .meta-grid{ grid-template-columns:1fr; }
+    .mini-grid, .hrv-grid, .sqi-grid, .rrqc-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .row{ gap:8px; }
+    .peak-detection-panel{ padding:10px; }
+    .gp-row{ flex-wrap:wrap; }
+    .gp-row label{ width:100%; }
+    .gp-slider{ max-width:none; width:100%; }
+    #rrModalBox{ width:calc(100% - 20px) !important; max-height:90vh !important; }
+    #rrModalBody > div[style*="grid-template-columns:150px"]{
+      grid-template-columns:1fr !important;
+      gap:3px 0 !important;
+    }
+  }
+
+  @media (max-width: 420px){
+    .mini-grid, .hrv-grid, .sqi-grid, .rrqc-grid{ grid-template-columns:1fr; }
+    select, button, input[type="number"], input[type="text"]{ max-width:100%; }
+  }
+
 </style>
 </head>
 <body>
@@ -377,7 +441,7 @@ function openBibWindow(key) {
     <div class="card">
       <h2> 1)<b>Signal:</b> Load Local WFDB Files (.hea + .dat/.mat) or CSV</h2>
       <div class="body">
-        <div class="row" style="gap:px">
+        <div class="row">
           <input id="fileInput" type="file" multiple accept=".hea,.dat,.mat" />
           <span id="fileSpinner" class="file-spinner"></span>
           <span class="badge">Virtual dir: <code>/home/pyodide/records/</code></span>
@@ -409,6 +473,13 @@ function openBibWindow(key) {
           <div class="row" style="margin-bottom:8px">
             <label>Channel</label>
             <select id="selChannel"></select>
+            <label>X-axis</label>
+            <select id="selXAxisUnit" title="Choose how the horizontal axis is displayed">
+              <option value="index" selected>Sample index</option>
+              <option value="s">Time (seconds)</option>
+              <option value="min">Time (minutes)</option>
+              <option value="h">Time (hours)</option>
+            </select>
             <label>Mode</label>
             <select id="selMode">
               <option value="nav">Navigate</option>
@@ -434,13 +505,14 @@ function openBibWindow(key) {
             <button id="btnMoreClassify" class="btn accent">More...</button>
             <span id="lastRPeakInfo" style="font-size:11px;color:#6b7280;margin-left:8px"></span>
           </div>
-          <div class="row" style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #18253d;">
+          <div class="row snap-controls">
             <label>Snap peaks to local max (±samples):</label>
             <input id="snapWindow" type="number" min="1" max="100" value="4" style="width:80px" />
             <button id="btnSnapPeaks" class="btn accent">Adjust</button>
             <span id="snapStatus" class="badge" style="display:none"></span>
-          
-          <div style="margin:10px 0 8px;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--panel2)">
+          </div>
+
+          <div class="peak-detection-panel">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
               <div style="font-weight:700">Peak detection</div>
               <div style="font-size:12px;color:var(--muted)">Run automatic detection on full signal or visible segment, assign results to a peak type.</div>
@@ -549,7 +621,7 @@ function openBibWindow(key) {
               <span id="detStatus" class="badge" style="display:none"></span>
             </div>
           </div>
-</div>
+
           <div class="legend" style="margin-bottom:8px">
             <span><span class="dot r"></span>R-peaks</span>
             <span><span class="dot p"></span>P-peaks</span>
@@ -776,7 +848,7 @@ function openBibWindow(key) {
             <label for="rrQcMode">Mode</label>
             <select id="rrQcMode" title="RR rejection rule">
               <option value="abs" selected>Absolute bounds</option>
-              <option value="rate">Rate-of-change bounds</option>
+              <option value="rate" selected>Rate-of-change bounds</option>
               <option value="both">Both</option>
             </select>
 
@@ -902,12 +974,47 @@ function openBibWindow(key) {
 </div>
       </div>
     </div>
-  </div>
 
 <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <script>
-  const state={ origFs:null, fs:null, origSignals:[], signals:[], nSamples:0, channelNames:[], units:[], peaks:{R:{},P:{},Q:{},S:{},T:{},U:{}}, recordBase:'', zoomState:null, annotationHistory:[], detectorSettings:null, rrQc:{mode:'abs', absMinMs:250, absMaxMs:2000, maxRelChange:0.20, compareToLastAccepted:true, gpKernel:'RQ'}, rrQcLast:{maskBad:[], rrCleanMs:[], applied:false} };
+  const state={ origFs:null, fs:null, origSignals:[], signals:[], nSamples:0, channelNames:[], units:[], peaks:{R:{},P:{},Q:{},S:{},T:{},U:{}}, recordBase:'', zoomState:null, annotationHistory:[], detectorSettings:null, rrQc:{mode:'abs', absMinMs:250, absMaxMs:2000, maxRelChange:0.20, compareToLastAccepted:true, gpKernel:'RQ'}, rrQcLast:{maskBad:[], rrCleanMs:[], applied:false}, xAxisUnit:'index' };
+
+  // ======== X-axis unit conversion (display only; all internal storage stays in sample indices) ========
+  const X_AXIS_UNIT_LABELS = { index:'Sample index', s:'Time (s)', min:'Time (min)', h:'Time (h)' };
+  function xAxisUnitScale(unit){
+    // Returns seconds-per-displayed-unit divisor factor relative to samples, i.e. multiply sample index by this to get display value.
+    if(!state.fs || !(state.fs>0)) return 1; // fall back to raw index if fs unknown
+    switch(unit){
+      case 's': return 1/state.fs;
+      case 'min': return 1/(state.fs*60);
+      case 'h': return 1/(state.fs*3600);
+      case 'index':
+      default: return 1;
+    }
+  }
+  // Convert a sample index (or array of sample indices, nulls preserved) to the currently selected display unit.
+  function idxToDisplayX(i){
+    if(i === null || i === undefined) return null;
+    const unit = state.xAxisUnit || 'index';
+    if(unit === 'index' || !state.fs) return i;
+    return i * xAxisUnitScale(unit);
+  }
+  function idxArrToDisplayX(arr){
+    return arr.map(v => v===null ? null : idxToDisplayX(v));
+  }
+  // Convert a displayed x-axis value back to the nearest sample index (used for clicks / hit-testing).
+  function displayXToIdx(x){
+    const unit = state.xAxisUnit || 'index';
+    if(unit === 'index' || !state.fs) return Math.round(x);
+    const scale = xAxisUnitScale(unit);
+    return Math.round(x / scale);
+  }
+  function xAxisUnitTitle(){
+    const unit = state.xAxisUnit || 'index';
+    if(unit !== 'index' && !state.fs) return X_AXIS_UNIT_LABELS.index; // no fs yet, stay in index
+    return X_AXIS_UNIT_LABELS[unit] || X_AXIS_UNIT_LABELS.index;
+  }
   // ======== Peak detection settings (per peak type) ========
   function _defaultDetectorSettings(){
     return {
@@ -1987,13 +2094,16 @@ def unpack_session(b64_str, fmt):
   }
 
   function _getVisibleSampleRange(){
-    // x-axis is in sample indices (integer-ish)
+    // zoomState.xaxis.range is stored in whatever unit is currently selected for the x axis
+    // (sample index, seconds, minutes, or hours) - convert back to sample indices here.
     let x0=0, x1=state.nSamples-1;
     if(state.zoomState && state.zoomState.xaxis && Array.isArray(state.zoomState.xaxis.range)){
       const r=state.zoomState.xaxis.range;
       if(r.length===2 && isFinite(r[0]) && isFinite(r[1])){
-        x0=Math.max(0, Math.min(state.nSamples-1, Math.floor(Math.min(r[0], r[1]))));
-        x1=Math.max(0, Math.min(state.nSamples-1, Math.ceil(Math.max(r[0], r[1]))));
+        const i0 = displayXToIdx(r[0]);
+        const i1 = displayXToIdx(r[1]);
+        x0=Math.max(0, Math.min(state.nSamples-1, Math.floor(Math.min(i0, i1))));
+        x1=Math.max(0, Math.min(state.nSamples-1, Math.ceil(Math.max(i0, i1))));
       }
     }
     return [x0,x1];
@@ -2024,30 +2134,44 @@ def unpack_session(b64_str, fmt):
     state.rrQc = cfg;
 
     const filt = rrFilterCombined(nnRawMs, cfg);
-    let nnCleanMs = filt.rr_clean.slice();
 
-    // If we already applied GP correction and the segment length matches, reuse it.
-    if(state.rrQcLast && state.rrQcLast.applied && Array.isArray(state.rrQcLast.rrCleanMs) && state.rrQcLast.rrCleanMs.length === nnRawMs.length){
-      nnCleanMs = state.rrQcLast.rrCleanMs.slice();
-    } else {
-      // keep a cached detection result for UI consistency; preserve flaggedRIdx if it exists
-      const prevFlagged = (state.rrQcLast && Array.isArray(state.rrQcLast.flaggedRIdx)) ? state.rrQcLast.flaggedRIdx : [];
-      state.rrQcLast = {maskBad: filt.mask_bad, rrCleanMs: nnCleanMs.slice(), applied:false, reason: filt.reason, rrRawMs: nnRawMs.slice(), flaggedRIdx: prevFlagged};
-    }
+    // ---- RR source of truth -------------------------------------------------
+    // nnRawMs is derived directly from the CURRENT displayed R-peak coordinates,
+    // so after any annotation repair it is already the corrected series. A stored
+    // value-only GP correction is reused ONLY when it provably belongs to this
+    // channel, sample window, peak identities and raw RR sequence -- never on the
+    // basis of array length.
+    let nnCleanMs = nnRawMs.slice();
+    let usedStoredCorrection = false;
+    try{
+      const ctxNow = _rrContext();
+      const stored = _rrValidatedCorrection(ctxNow);
+      if(stored){ nnCleanMs = stored.correctedMs.slice(); usedStoredCorrection = true; }
+    }catch(_e){ /* fall back to annotation-derived RR */ }
+
+    const prevFlagged = (state.rrQcLast && Array.isArray(state.rrQcLast.flaggedRIdx)) ? state.rrQcLast.flaggedRIdx : [];
+    state.rrQcLast = {maskBad: filt.mask_bad, rrCleanMs: nnCleanMs.slice(), applied: usedStoredCorrection,
+                      reason: filt.reason, rrRawMs: nnRawMs.slice(), flaggedRIdx: prevFlagged};
 
     const nBad = (state.rrQcLast.maskBad || []).filter(Boolean).length;
     _setRRQcText('rrFlaggedCount', String(nBad));
-    _setRRQcText('rrCorrectionInfo', (nBad===0) ? 'None flagged' : (state.rrQcLast.applied ? `GP corrected (${cfg.gpKernel})` : 'Flagged (not corrected)'));
+    _setRRQcText('rrCorrectionInfo', (nBad===0) ? 'None flagged'
+      : (usedStoredCorrection ? `GP corrected (${cfg.gpKernel})` : 'Flagged \u2014 awaiting review'));
 
-    // Accepted NN for statistics (exclude NaN)
-    const nnMs = nnCleanMs.filter(v=>isFinite(v) && v>0);
+    // Sequence-preserving analysis series: excluded intervals stay in place as NaN
+    const nnAnalysisMs = buildRRAnalysisSeries(nnCleanMs, filt.mask_bad);
+    nnCleanMs = nnAnalysisMs;
+
+    // Accepted NN for position-independent statistics (mean, SDNN, SampEn)
+    const nnMs = nnAnalysisMs.filter(v=>isFinite(v) && v>0);
 
     const meanNN=_mean(nnMs);
     const sdnn=_std(nnMs);
 
-    // successive differences of NN intervals
-    const dnn=[];
-    for(let i=1;i<nnMs.length;i++) dnn.push(nnMs[i]-nnMs[i-1]);
+    // Successive differences over ORIGINALLY ADJACENT valid pairs only, so that
+    // intervals on opposite sides of an excluded interval are never treated as
+    // neighbours. Feeds RMSSD, NN50, pNN50 and the Poincare descriptors.
+    const dnn = successiveDifferences(nnAnalysisMs);
     const rmssd = dnn.length ? Math.sqrt(_mean(dnn.map(v=>v*v))) : NaN;
     const nn50 = dnn.filter(v=>Math.abs(v)>50).length;
     const pnn50 = dnn.length ? (nn50/dnn.length*100) : NaN;
@@ -2098,7 +2222,6 @@ def unpack_session(b64_str, fmt):
         const w=_hann(N);
         let U=0;
         for(let i=0;i<N;i++) U += w[i]*w[i];
-        U = U/N;
 
         const Nfft=_nextPow2(N);
         const re=new Array(Nfft).fill(0);
@@ -2114,7 +2237,7 @@ def unpack_session(b64_str, fmt):
         for(let k=0;k<=half;k++){
           const mag2 = re[k]*re[k] + im[k]*im[k];
           // periodogram scaling (ms^2/Hz)
-          let P = (mag2)/(fsInterp*Nfft*Nfft*U);
+          let P = (mag2)/(fsInterp*U);
           if(k>0 && k<half) P *= 2; // one-sided
           freq[k]=k*fsInterp/Nfft;
           psd[k]=P;
@@ -2150,6 +2273,7 @@ def unpack_session(b64_str, fmt):
       nR:Rw.length,
       nNN:nnMs.length,
       nnSeries: nnMs.slice(),
+      nnAnalysisSeries: nnAnalysisMs.slice(),
       adf: adfResult
     };
   }
@@ -2773,8 +2897,14 @@ if(btnRRRemove){
       alert('Poincaré plot needs at least 3 valid NN intervals in the visible segment.');
       return;
     }
+    // Poincaré pairs must come from ORIGINALLY ADJACENT intervals: excluded
+    // intervals break the chain rather than joining their neighbours.
+    const seq = Array.isArray(res.nnAnalysisSeries) ? res.nnAnalysisSeries : res.nnSeries;
     const xs=[], ys=[];
-    for(let i=0;i<nn.length-1;i++){ xs.push(nn[i]); ys.push(nn[i+1]); }
+    for(let i=1;i<seq.length;i++){
+      const a=seq[i-1], b=seq[i];
+      if(isFinite(a) && a>0 && isFinite(b) && b>0){ xs.push(a); ys.push(b); }
+    }
 
     const isDark = (document.documentElement.getAttribute('data-theme') === 'dark');
     const chName = (state.channelNames && state.channelNames[currentChannel] != null)
@@ -3133,7 +3263,7 @@ if(btnRRRemove){
     const sig=state.signals[idx];
     
     // Plot full signal without decimation
-    const xData = Array.from({length: sig.length}, (_, i) => i);
+    const xData = Array.from({length: sig.length}, (_, i) => idxToDisplayX(i));
     const yData = Array.from(sig);
 
     const traces = [{x:xData, y:yData, type:'scatter', mode:'lines', name:state.channelNames[idx]||`CH${idx}`, line:{color:'#3b82f6'}}];
@@ -3155,7 +3285,7 @@ if(btnRRRemove){
             const validYvals = validPeaks.map(p=>sig[p]).filter(y=>isFinite(y));
             if(validYvals.length === validPeaks.length){
               traces.push({
-                x:validPeaks, 
+                x:idxArrToDisplayX(validPeaks), 
                 y:validYvals, 
                 type:'scatter', 
                 mode:'markers', 
@@ -3167,24 +3297,11 @@ if(btnRRRemove){
           }
         }
 
-        // RR-QC flagged peaks (purple ring + red fill)
-        const flagged = (state.rrQcLast && Array.isArray(state.rrQcLast.flaggedRIdx)) ? state.rrQcLast.flaggedRIdx : [];
-        if(flagged.length){
-          const validF = flagged.filter(p=>p>=0 && p<sig.length);
-          const yF = validF.map(p=>sig[p]);
-          if(yF.length === validF.length){
-            traces.push({
-              x: validF,
-              y: yF,
-              type: 'scatter',
-              mode: 'markers',
-              name: 'RR-flagged',
-              marker: {color: '#ef4444', size: 10, line: {color: '#a855f7', width: 3}},
-              hovertext: validF.map(p=>`RR-flagged R @ ${p}`),
-              showlegend: true
-            });
-          }
-        }
+        // RR review overlay: hollow status rings + coloured interval segments.
+        // The original R-peak markers above keep their beat-type fill.
+        try{
+          for(const t of buildRRReviewTraces(idx, sig)) traces.push(t);
+        }catch(_e){ console.warn('RR review overlay failed', _e); }
       } else {
         // Other peaks: simple array structure
         const peaks = (state.peaks[peakType][idx]||[]).filter(p=>p>=0 && p<sig.length);
@@ -3200,12 +3317,13 @@ if(btnRRRemove){
           }
           if(validPeaks.length) {
             traces.push({
-              x:validPeaks, 
+              x:idxArrToDisplayX(validPeaks), 
               y:validYvals, 
               type:'scatter', 
               mode:'markers', 
               name:name, 
-              marker:{color:color, size:8}
+              marker:{color:color, size:8},
+              hovertext: validPeaks.map(p=>`${name} @ ${p}`)
             });
           }
         }
@@ -3230,7 +3348,7 @@ if(btnRRRemove){
       paper_bgcolor: panelBg,
       plot_bgcolor: panelBg,
       font: {color: textCol},
-      xaxis:{title:'Sample index', gridcolor:gridCol, zerolinecolor:gridCol},
+      xaxis:{title:xAxisUnitTitle(), gridcolor:gridCol, zerolinecolor:gridCol},
       yaxis:{title:`Amplitude (${state.units[idx]||'mV'})`, gridcolor:gridCol, zerolinecolor:gridCol},
       showlegend:false,
       hovermode:'closest'
@@ -3286,8 +3404,11 @@ if(btnRRRemove){
 
   function handlePlotClick(data){
     if(!data.points.length) return;
+    // A click on a flagged RR ring / interval opens the review panel instead of
+    // adding or deleting an annotation.
+    try{ if(_rrHandlePlotClickForReview(data)) return; }catch(_e){}
     const mode = document.getElementById('selMode').value;
-    const x = Math.round(data.points[0].x);
+    const x = displayXToIdx(data.points[0].x);
     if(mode==='addR'){ addPeak('R', currentChannel, x); }
     else if(mode==='addP'){ addPeak('P', currentChannel, x); }
     else if(mode==='addQ'){ addPeak('Q', currentChannel, x); }
@@ -3301,7 +3422,9 @@ if(btnRRRemove){
     if(type === 'R'){
       // R-peaks use object structure with beat type
       if(!state.peaks[type][channel]) state.peaks[type][channel]=[];
-      const newPeak = {index: idx, type: 'N'};  // Default to Normal
+      // Stable id + provenance so RR review cases survive edits and redraws
+      const newPeak = {index: idx, type: 'N', id: createPeakId(), source: 'manual',
+                       synthetic: false, qrsConfirmed: true};  // Default to Normal
       state.peaks[type][channel].push(newPeak);
       state.peaks[type][channel].sort((a,b)=>a.index-b.index);
       // Record in history for undo
@@ -3318,6 +3441,7 @@ if(btnRRRemove){
       // Record in history for undo
       state.annotationHistory.push({type: type, channel: channel, index: idx});
     }
+    if(type === 'R') invalidateRRCorrection('R-peak added');
     updateBadges();
     drawCurrentChannel();
     log(`Added ${type}-peak at sample ${idx} (CH ${state.channelNames[channel]})`,'success');
@@ -3336,6 +3460,7 @@ if(btnRRRemove){
     if(bestType && bestIdx>=0 && bestDist<50){
       const removed = state.peaks[bestType][channel].splice(bestIdx, 1)[0];
       const removedIdx = (bestType === 'R') ? removed.index : removed;
+      if(bestType === 'R') invalidateRRCorrection('R-peak deleted');
       updateBadges();
       drawCurrentChannel();
       log(`Removed ${bestType}-peak at sample ${removedIdx} (CH ${state.channelNames[channel]})`,'warning');
@@ -3345,6 +3470,14 @@ if(btnRRRemove){
   async function updateAnnotationTraces(){ await drawCurrentChannel(); }
 
   document.getElementById('selChannel').addEventListener('change', drawCurrentChannel);
+  document.getElementById('selXAxisUnit').addEventListener('change', (e)=>{
+    state.xAxisUnit = e.target.value;
+    // Any stored zoom range was captured in the previous unit's scale, so it no
+    // longer corresponds to the same window once the axis is rescaled. Reset to
+    // full view rather than risk mis-scaled pan/zoom bounds.
+    state.zoomState = null;
+    drawCurrentChannel();
+  });
 
   // ======== R-peak Classification System ========
   
@@ -3808,7 +3941,9 @@ if(btnRRRemove){
     if(peakType === 'R'){
       const arr = state.peaks.R[channel] || [];
       const keep = replace ? arr.filter(p=>p.index < s0 || p.index > s1) : arr.slice();
-      const add = indices.map(i=>({index:i, type:rSubtype || 'N'}));
+      const add = indices.map(i=>({index:i, type:rSubtype || 'N', id: createPeakId(),
+                                   source:'detected', synthetic:false, qrsConfirmed:true}));
+      invalidateRRCorrection('R-peak detection re-run');
       const merged = keep.concat(add);
       // de-duplicate by index keeping first occurrence
       merged.sort((a,b)=>a.index-b.index);
@@ -4047,7 +4182,7 @@ if(btnRRRemove){
   // ======== Export annotations (CSV) ========
   document.getElementById('btnExportCSV').addEventListener('click', ()=>{
     if(!state.signals.length){ return setError('Load a signal first'); }
-    const rows=[["channel_index","channel_name","label","index","time_s","value","beat_type"]]; 
+    const rows=[["channel_index","channel_name","label","index","time_s","value","beat_type","peak_id","source","synthetic","qrs_confirmed"]]; 
     for(let ch=0; ch<state.channelNames.length; ch++){ 
       const name=state.channelNames[ch]; 
       for(const [label, byCh] of Object.entries(state.peaks)){ 
@@ -4059,14 +4194,16 @@ if(btnRRRemove){
             const beatType = peak.type || 'N';
             const t=idx/state.fs; 
             const v=state.signals[ch][idx]; 
-            rows.push([ch,name,label,idx,t.toFixed(6),v,beatType]); 
+            rows.push([ch,name,label,idx,t.toFixed(6),v,beatType,
+                       peak.id||'', peak.source||'detected',
+                       peak.synthetic?1:0, (peak.qrsConfirmed===false)?0:1]); 
           }
         } else {
           // Other peaks don't have beat type
           for(const idx of chData){ 
             const t=idx/state.fs; 
             const v=state.signals[ch][idx]; 
-            rows.push([ch,name,label,idx,t.toFixed(6),v,'']); 
+            rows.push([ch,name,label,idx,t.toFixed(6),v,'','','','','']); 
           } 
         }
       } 
@@ -4372,11 +4509,19 @@ if(btnRRRemove){
       // ---- Peaks / corrections / annotations ----
       peaks: state.peaks,
       annotationHistory: state.annotationHistory||[],
+      // ---- RR review cases + correction provenance ----
+      rrReview: {
+        cases: state.rrCases||[],
+        correction: state.rrCorrection||null,
+        peakIdSeq: state.peakIdSeq||0,
+        metadata: (typeof rrCorrectionExportJSON==='function') ? rrCorrectionExportJSON() : null
+      },
       // ---- Settings (detector, RR-QC, GP, all UI controls) ----
       settings: {
         detectorSettings: state.detectorSettings,
         rrQc: state.rrQc,
         rrQcLast: state.rrQcLast,
+        rrReviewCfg: state.rrReviewCfg,
         ui: { values: ui.values, checks: ui.checks }
       },
       // ---- Current view & selection (zoom window = selected samples) ----
@@ -4511,6 +4656,13 @@ if(btnRRRemove){
       else { initDetectorSettings(); }
       if(settings.rrQc){ state.rrQc = settings.rrQc; }
       if(settings.rrQcLast){ state.rrQcLast = settings.rrQcLast; }
+      if(settings.rrReviewCfg){ state.rrReviewCfg = Object.assign({}, RR_REVIEW_DEFAULTS, settings.rrReviewCfg); }
+      if(session.rrReview){
+        state.rrCases      = session.rrReview.cases || [];
+        state.rrCorrection = session.rrReview.correction || null;
+        state.peakIdSeq    = session.rrReview.peakIdSeq || state.peakIdSeq || 0;
+      }
+      try{ ensureAllRPeakMeta(); renderRRReviewSummary(); }catch(_e){}
 
       // ---- Restore current view & selection ----
       const view = session.view || {};
@@ -5130,6 +5282,1525 @@ if(btnRRRemove){
   // Init text
   log('App ready. Load a record or CSV, zoom in, and add peaks (R, P, T, or U) – zoom persists and peaks pin to the plotted line.');
 
+
+
+  // ---------- new persistent state (additive) ----------
+  state.rrCases          = [];    // review cases for the current channel+segment
+  state.rrRepairPreview  = null;  // uncommitted overlay only
+  state.rrRepairHistory  = [];    // undo stack of full snapshots
+  state.rrCorrection     = null;  // value-only GP correction + its source identity
+  state.peakIdSeq        = 0;
+
+  const RR_REVIEW_DEFAULTS = {
+    alpha:        0.20,   // misplaced: min relative deviation of each side
+    betaMis:      0.15,   // misplaced: max relative deviation of the pair sum
+    betaFp:       0.20,   // false positive: max relative deviation of L+R from M
+    gammaFp:      0.85,   // false positive: each side must be < gamma * M
+    missingRatio: 1.55,   // gap/M above which a missing beat is considered
+    localWin:     8,      // half-window (intervals) for the robust local median
+    snapEnabled:  true,
+    snapWindowMs: 150,    // +/- search window for QRS snapping
+    snapMinConf:  0.35,   // minimum QRS confidence required to snap
+    previewFirst: true,
+    gpInput:      'time', // 'time' (preserved default) | 'index'
+    gpCenter:     true    // centre y on the training mean before GP regression
+  };
+  state.rrReviewCfg = Object.assign({}, RR_REVIEW_DEFAULTS);
+
+  function _rrCfg(){ return state.rrReviewCfg || RR_REVIEW_DEFAULTS; }
+
+  function createPeakId(){
+    state.peakIdSeq = (state.peakIdSeq||0) + 1;
+    return 'r-' + state.peakIdSeq;
+  }
+
+  // ---------- peak metadata normalisation ----------
+  // Gives every R-peak object a stable id + provenance fields, and repairs the
+  // legacy `subtype` key that older auto-insertion code wrote instead of `type`.
+  function ensureRPeakMeta(channel){
+    const arr = state.peaks.R[channel];
+    if(!Array.isArray(arr)) return [];
+    for(const p of arr){
+      if(!p || typeof p !== 'object') continue;
+      if(p.subtype !== undefined){
+        if(p.type === undefined) p.type = p.subtype;
+        delete p.subtype;
+      }
+      if(p.type === undefined || p.type === null || p.type === '') p.type = 'N';
+      if(!p.id) p.id = createPeakId();
+      if(p.source === undefined)       p.source = 'detected';
+      if(p.synthetic === undefined)    p.synthetic = false;
+      if(p.qrsConfirmed === undefined) p.qrsConfirmed = true;
+    }
+    return arr;
+  }
+
+  function ensureAllRPeakMeta(){
+    for(const ch in state.peaks.R) ensureRPeakMeta(ch);
+  }
+
+  function sortRPeaks(channel){
+    const ch = (channel === undefined) ? currentChannel : channel;
+    const arr = state.peaks.R[ch];
+    if(Array.isArray(arr)) arr.sort((a,b)=> a.index - b.index);
+    return arr || [];
+  }
+
+  function _rrPeakById(channel, id){
+    const arr = state.peaks.R[channel] || [];
+    return arr.find(p=> p.id === id) || null;
+  }
+
+  // ---------- segment context ----------
+  // Everything downstream is derived from THIS object, so a stored correction
+  // can never leak across channels or visible segments.
+  function _rrContext(){
+    if(!state.fs) return null;
+    const ch = currentChannel;
+    ensureRPeakMeta(ch);
+    sortRPeaks(ch);
+    const [s0,s1] = _getVisibleSampleRange();
+    const win = (state.peaks.R[ch]||[]).filter(p=> Number.isFinite(p.index) && p.index>=s0 && p.index<=s1);
+    const rrMs = [];
+    for(let i=1;i<win.length;i++) rrMs.push((win[i].index - win[i-1].index)/state.fs*1000);
+    return {channel: ch, s0, s1, peaks: win, rrMs};
+  }
+
+  // Identity of the data a stored correction was computed from. A correction is
+  // reusable only if channel, sample window, exact peak ids/indices and the raw
+  // RR sequence all match -- never by array length alone.
+  function _rrSourceKey(ctx){
+    if(!ctx) return null;
+    return JSON.stringify({
+      ch: ctx.channel,
+      s0: ctx.s0, s1: ctx.s1,
+      fs: state.fs,
+      ids: ctx.peaks.map(p=> p.id),
+      ix:  ctx.peaks.map(p=> p.index),
+      rr:  ctx.rrMs.map(v=> Math.round(v*1000)/1000)
+    });
+  }
+
+  function invalidateRRCorrection(reason){
+    if(state.rrCorrection){
+      state.rrCorrection = null;
+      if(reason) log('RR correction cache invalidated ('+reason+').','info');
+    }
+    state.rrRepairPreview = null;
+    if(state.rrQcLast) state.rrQcLast.applied = false;
+  }
+
+  // Returns the stored corrected RR series only when it provably belongs to the
+  // data currently on screen; otherwise null.
+  function _rrValidatedCorrection(ctx){
+    const c = state.rrCorrection;
+    if(!c || !ctx) return null;
+    if(c.sourceKey !== _rrSourceKey(ctx)) return null;
+    if(!Array.isArray(c.correctedMs) || c.correctedMs.length !== ctx.rrMs.length) return null;
+    return c;
+  }
+
+  // ---------- robust statistics ----------
+  function _rrMedian(arr){
+    const s = (arr||[]).filter(v=>Number.isFinite(v)).sort((a,b)=>a-b);
+    if(!s.length) return NaN;
+    const m = s.length>>1;
+    return (s.length%2) ? s[m] : (s[m-1]+s[m])/2;
+  }
+
+  // Robust local median built from surrounding ACCEPTED intervals only.
+  function _rrLocalMedian(rrMs, centre, maskBad, halfWin){
+    const h = halfWin || _rrCfg().localWin;
+    const pool = [];
+    for(let k=Math.max(0,centre-h); k<=Math.min(rrMs.length-1, centre+h); k++){
+      if(k===centre) continue;
+      if(maskBad && maskBad[k]) continue;
+      const v = rrMs[k];
+      if(Number.isFinite(v) && v>0) pool.push(v);
+    }
+    if(pool.length < 3){
+      const all = rrMs.filter((v,k)=> Number.isFinite(v) && v>0 && !(maskBad && maskBad[k]));
+      if(all.length) return _rrMedian(all);
+      return _rrMedian(rrMs.filter(v=>Number.isFinite(v)&&v>0));
+    }
+    return _rrMedian(pool);
+  }
+
+  /* ==========================================================================
+     GP CORE  --  predicts values AND uncertainty.
+     This function never decides whether a peak should be added, removed or
+     moved; it only regresses RR given training data.
+     ========================================================================== */
+  function gpPredictRR(xTrain, yTrainMs, xPred, kernelName, opts){
+    const o = Object.assign({sigmaN: 0.02, jitter: 1e-8, centre: _rrCfg().gpCenter}, opts||{});
+    const m = xTrain.length, p = xPred.length;
+    if(m < 2 || p < 1) return {ok:false, msg:'GP needs \u22652 training intervals.'};
+
+    const kfn = _kernelFactory(kernelName);           // untouched default params
+    const y   = yTrainMs.map(v=> Number(v)/1000.0);   // seconds (preserved unit)
+
+    // Zero-mean GPs with the study's very small signal variances collapse the
+    // posterior toward 0 s. Centring on the training mean is the documented
+    // fix for that implementation mismatch; kernel parameters are unchanged.
+    let mu = 0;
+    if(o.centre){
+      let s=0, n=0;
+      for(const v of y){ if(Number.isFinite(v)){ s+=v; n++; } }
+      mu = n ? s/n : 0;
+    }
+    const yc = y.map(v=> v - mu);
+
+    const K = Array.from({length:m}, ()=> new Array(m).fill(0));
+    for(let i=0;i<m;i++){
+      for(let j=0;j<=i;j++){
+        const v = kfn(xTrain[i], xTrain[j]);
+        K[i][j] = v; K[j][i] = v;
+      }
+    }
+    for(let i=0;i<m;i++) K[i][i] += o.sigmaN*o.sigmaN + o.jitter;
+
+    let L = _choleskyDecomp(K);
+    if(!L){
+      for(let i=0;i<m;i++) K[i][i] += 1e-6;
+      L = _choleskyDecomp(K);
+      if(!L) return {ok:false, msg:'GP failed (non\u2011SPD covariance).'};
+    }
+
+    const alpha = _solveUpperFromLower(L, _solveLower(L, yc));
+
+    // Cross-covariance and posterior covariance of the predicted points
+    const Ks = Array.from({length:p}, (_,a)=> xTrain.map(xt=> kfn(xPred[a], xt)));
+    const mean = new Array(p);
+    for(let a=0;a<p;a++){
+      let s=0;
+      for(let j=0;j<m;j++) s += Ks[a][j]*alpha[j];
+      mean[a] = (s + mu)*1000.0;    // back to ms
+    }
+
+    // v_a = L^{-1} k_*a   ->  cov = Kss - V^T V
+    const V = Ks.map(row=> _solveLower(L, row));
+    const cov = Array.from({length:p}, ()=> new Array(p).fill(0));
+    for(let a=0;a<p;a++){
+      for(let b=0;b<=a;b++){
+        let s = kfn(xPred[a], xPred[b]);
+        for(let k=0;k<m;k++) s -= V[a][k]*V[b][k];
+        cov[a][b] = s*1e6;          // s^2 -> ms^2
+        cov[b][a] = cov[a][b];
+      }
+    }
+    const sd = cov.map((row,a)=> row[a] > 0 ? Math.sqrt(row[a]) : 0);
+    return {ok:true, mean, cov, sd, kernel: kernelName, centred: !!o.centre};
+  }
+
+  // Simple fallback: rescale so the intervals sum exactly to the bounding gap.
+  function constrainIntervalsToGap(predictedMs, gapMs){
+    const total = predictedMs.reduce((sum, value) => sum + value, 0);
+    if (!Number.isFinite(total) || total <= 0) {
+      throw new Error("Invalid GP interval prediction.");
+    }
+    return predictedMs.map(value => value * gapMs / total);
+  }
+
+  // Preferred: condition the multivariate Gaussian on the known total.
+  //   m|sum=G  =  m + C1 (G - 1'm) / (1'C1)
+  // Falls back to proportional rescaling, then to an equal split.
+  function conditionIntervalsOnGap(mean, cov, gapMs, minMs, maxMs){
+    const p = mean.length;
+    let out = null, method = '';
+    if(cov && cov.length === p){
+      const C1 = new Array(p).fill(0);
+      let denom = 0, s = 0;
+      for(let a=0;a<p;a++){
+        for(let b=0;b<p;b++) C1[a] += cov[a][b];
+        denom += C1[a];
+        s += mean[a];
+      }
+      if(Number.isFinite(denom) && Math.abs(denom) > 1e-12){
+        const k = (gapMs - s)/denom;
+        const cand = mean.map((v,a)=> v + C1[a]*k);
+        if(cand.every(v=> Number.isFinite(v) && v > 0)){
+          out = cand; method = 'gaussian_conditioned';
+          // Conditional covariance given 1'y = G. Singular along 1 by
+          // construction, since the sum is no longer a random quantity.
+          covG = cov.map((row,a)=> row.map((v,b)=> v - C1[a]*C1[b]/denom));
+        }
+      }
+    }
+    if(!out){
+      try{
+        const pos = mean.map(v=> (Number.isFinite(v) && v > 0) ? v : NaN);
+        if(pos.every(v=> Number.isFinite(v))){
+          out = constrainIntervalsToGap(pos, gapMs);
+          method = 'proportional_rescale';
+        }
+      }catch(_e){ /* fall through */ }
+    }
+    if(!out){
+      out = new Array(p).fill(gapMs/p);
+      method = 'equal_split';
+    }
+    // Physiological guard: if any reconstructed interval is out of bounds the
+    // proposal is rejected upstream rather than silently clipped.
+    const lo = Number.isFinite(minMs) ? minMs : 250;
+    const hi = Number.isFinite(maxMs) ? maxMs : 2000;
+    const valid = out.every(v=> Number.isFinite(v) && v >= lo && v <= hi);
+    const sum = out.reduce((a,b)=>a+b,0);
+    
+    const sdG = covG ? covG.map((r,a)=> r[a] > 0 ? Math.sqrt(r[a]) : 0) : null;
+    return {intervals: out, method, valid, sumErrorMs: sum - gapMs, covG, sdG};
+  }
+
+  /* ==========================================================================
+     QRS CANDIDATE SEARCH (optional snapping)
+     Scores local candidates by baseline-removed absolute amplitude, prominence
+     and slope energy, so positive AND inverted QRS complexes are both handled.
+     Never moves annotations globally -- one peak at a time, on request.
+     ========================================================================== */
+  function _rrEcgAvailable(){
+    return !!(state.signals && state.signals.length && state.signals[currentChannel] && state.fs);
+  }
+
+  function findQRSCandidate(channel, centreSample, halfWinSamples){
+    if(!_rrEcgAvailable()) return null;
+    const sig = state.signals[channel];
+    if(!sig || !sig.length) return null;
+    const h  = Math.max(2, Math.round(halfWinSamples||0));
+    const a  = Math.max(1, Math.round(centreSample) - h);
+    const b  = Math.min(sig.length-2, Math.round(centreSample) + h);
+    if(b <= a) return null;
+
+    // Local baseline from the full search window (robust to DC offset)
+    const seg = [];
+    for(let i=a;i<=b;i++){ const v = sig[i]; if(Number.isFinite(v)) seg.push(v); }
+    if(seg.length < 5) return null;
+    const base = _rrMedian(seg);
+
+    let best = null, ampMax = 0, slpMax = 0;
+    const scored = [];
+    for(let i=a;i<=b;i++){
+      const v = sig[i];
+      if(!Number.isFinite(v)) continue;
+      const amp = Math.abs(v - base);
+      const d1  = Math.abs((sig[i+1] - sig[i-1])/2);
+      const slp = Number.isFinite(d1) ? d1 : 0;
+      // local extremum test (accepts upright and inverted complexes)
+      const isExt = (v >= sig[i-1] && v >= sig[i+1]) || (v <= sig[i-1] && v <= sig[i+1]);
+      if(!isExt) continue;
+      if(amp > ampMax) ampMax = amp;
+      if(slp > slpMax) slpMax = slp;
+      scored.push({index:i, amp, slp});
+    }
+    if(!scored.length || ampMax <= 0) return null;
+
+    for(const c of scored){
+      const na = c.amp/ampMax;
+      const ns = slpMax > 0 ? c.slp/slpMax : 0;
+      // distance penalty keeps the search local
+      const dist = Math.abs(c.index - centreSample)/h;
+      c.score = (0.6*na + 0.4*ns) * (1 - 0.35*Math.min(1, dist));
+      if(!best || c.score > best.score) best = c;
+    }
+    if(!best) return null;
+
+    // Confidence: how much the winner stands out from the window population
+    const scores = scored.map(c=>c.score).sort((a,b)=>b-a);
+    const runnerUp = scores.length > 1 ? scores[1] : 0;
+    const meanScore = scores.reduce((s,v)=>s+v,0)/scores.length;
+    const sep = best.score > 0 ? (best.score - Math.max(runnerUp*0.0, meanScore))/best.score : 0;
+    const confidence = Math.max(0, Math.min(1, 0.55*best.score + 0.45*sep));
+    return {index: best.index, confidence, amplitude: best.amp, slope: best.slp};
+  }
+
+  // Morphology confidence AT an existing peak -- used to strengthen or weaken
+  // the false-positive suggestion.
+  function _rrQrsConfidenceAt(channel, sample){
+    if(!_rrEcgAvailable()) return null;
+    const halfWin = Math.max(4, Math.round(0.060*state.fs));
+    const c = findQRSCandidate(channel, sample, halfWin);
+    if(!c) return null;
+    const off = Math.abs(c.index - sample)/Math.max(1, halfWin);
+    return Math.max(0, Math.min(1, c.confidence * (1 - 0.6*Math.min(1, off))));
+  }
+
+  /* ==========================================================================
+     STAGE 1 + 2 : DETECTION  ->  REVIEW CASES  ->  STRUCTURAL SUGGESTION
+     ========================================================================== */
+  function buildRRReviewCases(){
+    const ctx = _rrContext();
+    if(!ctx || ctx.peaks.length < 2){
+      state.rrCases = [];
+      return {ok:false, msg:'Need \u22652 R-peaks in the visible segment.', cases:[]};
+    }
+    const cfg = _readRRQcConfigFromUI();
+    state.rrQc = cfg;
+    const filt = rrFilterCombined(ctx.rrMs, cfg);
+
+    // Preserve decisions the user already made for identical regions
+    const previous = new Map();
+    for(const c of (state.rrCases||[])){
+      if(c.status === 'reviewed' || c.applied) previous.set(c.leftPeakId + '|' + c.rightPeakId, c);
+    }
+
+    const cases = [];
+    for(let i=0;i<ctx.rrMs.length;i++){
+      if(!filt.mask_bad[i]) continue;
+      const left  = ctx.peaks[i];
+      const right = ctx.peaks[i+1];
+      const reasons = [];
+      if(filt.reason[i] === 'abs_bounds' || filt.reason[i] === 'both') reasons.push('absolute_limit');
+      if(filt.reason[i] === 'rate_change' || filt.reason[i] === 'both') reasons.push('relative_change');
+
+      const key = left.id + '|' + right.id;
+      const prior = previous.get(key);
+
+      const c = {
+        id: 'rr-case-' + i + '-' + left.id,
+        channel: ctx.channel,
+        intervalIndices: [i],
+        leftPeakId:   left.id,
+        middlePeakId: null,
+        rightPeakId:  right.id,
+        rawIntervalsMs: [ctx.rrMs[i]],
+        detectionReasons: reasons,
+        suggestedType: 'timing_artifact',
+        suggestionScore: 0,
+        suggestionDetail: '',
+        status: 'unreviewed',
+        selectedAction: null,
+        proposedIntervalsMs: [],
+        proposedPeakChanges: [],
+        includeInHRV: true,
+        snapToECG: _rrCfg().snapEnabled,
+        applied: false,
+        gpMeta: null
+      };
+      if(prior){
+        c.status         = prior.status;
+        c.selectedAction = prior.selectedAction;
+        c.includeInHRV   = prior.includeInHRV;
+        c.applied        = prior.applied;
+      }
+      cases.push(c);
+    }
+
+    state.rrCases = cases;
+    state.rrQcLast = {
+      maskBad: filt.mask_bad,
+      rrCleanMs: filt.rr_clean.slice(),
+      applied: false,
+      reason: filt.reason,
+      rrRawMs: ctx.rrMs.slice(),
+      flaggedRIdx: cases.map(c=>{ const p=_rrPeakById(ctx.channel, c.rightPeakId); return p?p.index:null; }).filter(v=>v!==null)
+    };
+
+    for(const c of cases) classifyRRCase(c.id, ctx, filt.mask_bad);
+    return {ok:true, cases, ctx, maskBad: filt.mask_bad};
+  }
+
+  function _rrFindCase(caseId){ return (state.rrCases||[]).find(c=> c.id === caseId) || null; }
+
+  /* Structural suggestion. Emits a hypothesis + confidence only -- it never
+     edits annotations. Thresholds are all exposed in the review UI.          */
+  function classifyRRCase(caseId, ctxIn, maskBadIn){
+    const c = _rrFindCase(caseId);
+    if(!c) return null;
+    const ctx = ctxIn || _rrContext();
+    if(!ctx) return null;
+    const maskBad = maskBadIn || (state.rrQcLast ? state.rrQcLast.maskBad : null);
+    const rc  = _rrCfg();
+    const qc  = state.rrQc || _readRRQcConfigFromUI();
+    const i   = c.intervalIndices[0];
+    const rr  = ctx.rrMs;
+    const G   = rr[i];
+    const M   = _rrLocalMedian(rr, i, maskBad, rc.localWin);
+
+    const hyps = [];
+
+    // ---- (2) missed R peak: one long gap that is a multiple of the local median
+    if(Number.isFinite(M) && M > 0 && Number.isFinite(G)){
+      const ratio = G/M;
+      const m0 = Math.round(ratio) - 1;
+      if(ratio >= rc.missingRatio && m0 >= 1){
+        const residual = Math.abs(ratio - Math.round(ratio))/Math.max(1, Math.round(ratio));
+        hyps.push({type:'missing_peak', score: Math.max(0, Math.min(1, 1 - 2.2*residual)),
+                   detail:`gap/M = ${ratio.toFixed(2)} \u2192 ${m0} missing beat(s)`, m0});
+      }
+    }
+
+    // ---- (3)/(4) two-sided structural tests around each interior peak
+    // interval i touches peaks[i] and peaks[i+1]; test both as the "middle" peak
+    for(const j of [i, i+1]){
+      if(j <= 0 || j >= ctx.peaks.length-1) continue;
+      const L = rr[j-1], R = rr[j];
+      if(!(Number.isFinite(L) && Number.isFinite(R))) continue;
+      const Mj = _rrLocalMedian(rr, j, maskBad, rc.localWin);
+      if(!(Number.isFinite(Mj) && Mj > 0)) continue;
+      const pid = ctx.peaks[j].id;
+
+      // false positive: L + R reconstructs ONE normal interval
+      const dSum = Math.abs((L + R) - Mj)/Mj;
+      if(dSum < rc.betaFp && L < rc.gammaFp*Mj && R < rc.gammaFp*Mj){
+        let score = Math.max(0, Math.min(1, 1 - dSum/rc.betaFp));
+        const qconf = _rrQrsConfidenceAt(ctx.channel, ctx.peaks[j].index);
+        // A weak QRS at the middle marker raises the false-positive score.
+        if(qconf !== null) score = Math.max(0, Math.min(1, 0.65*score + 0.35*(1 - qconf)));
+        hyps.push({type:'false_positive', score, middlePeakId: pid,
+                   detail:`L+R = ${(L+R).toFixed(0)} ms vs M = ${Mj.toFixed(0)} ms` +
+                          (qconf!==null ? `, QRS conf ${(qconf*100).toFixed(0)}%` : '')});
+      }
+
+      // misplaced: one side short, the other long, pair sum still ~2M
+      const dL = (L - Mj)/Mj, dR = (R - Mj)/Mj;
+      const dPair = Math.abs((L + R) - 2*Mj)/(2*Mj);
+      if(dL*dR < 0 && Math.abs(dL) > rc.alpha && Math.abs(dR) > rc.alpha && dPair < rc.betaMis){
+        const score = Math.max(0, Math.min(1, (1 - dPair/rc.betaMis) *
+                                              Math.min(1, (Math.abs(dL)+Math.abs(dR))/(4*rc.alpha))));
+        hyps.push({type:'misplaced_peak', score, middlePeakId: pid,
+                   detail:`L=${L.toFixed(0)} ms, R=${R.toFixed(0)} ms, |L+R-2M|/2M = ${dPair.toFixed(3)}`});
+      }
+    }
+
+    // ---- (5) true physiological interval: inside physiological limits and not
+    //          structurally explained (e.g. ectopic + compensatory pause)
+    const loMs = Number.isFinite(qc.absMinMs) ? qc.absMinMs : 250;
+    const hiMs = Number.isFinite(qc.absMaxMs) ? qc.absMaxMs : 2000;
+    if(Number.isFinite(G) && G >= loMs && G <= hiMs){
+      hyps.push({type:'physiological', score: 0.35,
+                 detail:`RR ${G.toFixed(0)} ms is within physiological limits (${loMs}\u2013${hiMs} ms)`});
+    }
+
+    // ---- (1) ordinary timing artifact (always available as the fallback)
+    hyps.push({type:'timing_artifact', score: 0.25,
+               detail: Number.isFinite(M) ? `local median M = ${M.toFixed(0)} ms` : 'no robust local median'});
+
+    hyps.sort((a,b)=> b.score - a.score);
+    const best = hyps[0];
+    c.suggestedType    = best.type;
+    c.suggestionScore  = Math.round(best.score*100)/100;
+    c.suggestionDetail = best.detail || '';
+    c.localMedianMs    = Number.isFinite(M) ? M : null;
+    c.candidateMissing = (best.type === 'missing_peak') ? best.m0 : null;
+    c.middlePeakId     = best.middlePeakId || null;
+    c.allHypotheses    = hyps.map(h=>({type:h.type, score:Math.round(h.score*100)/100}));
+    return c;
+  }
+
+  /* ==========================================================================
+     STAGE 3 : PROPOSALS (preview only -- committed annotations untouched)
+     ========================================================================== */
+
+  // Build the GP training set from all ACCEPTED intervals of the segment.
+  // Returns x for the observed intervals plus a helper for latent x positions.
+  function _rrGpAxis(ctx, maskBad, excludeIdx){
+    const rc = _rrCfg();
+    const useIndex = (rc.gpInput === 'index');
+    const t0 = ctx.s0/state.fs;
+    const xObs = [];
+    for(let i=0;i<ctx.rrMs.length;i++){
+      xObs.push(useIndex ? i : (ctx.peaks[i+1].index/state.fs - t0));
+    }
+    const trainIdx = [];
+    for(let i=0;i<ctx.rrMs.length;i++){
+      if(maskBad && maskBad[i]) continue;
+      if(excludeIdx && excludeIdx.indexOf(i) >= 0) continue;
+      if(Number.isFinite(ctx.rrMs[i]) && ctx.rrMs[i] > 0) trainIdx.push(i);
+    }
+    return {
+      useIndex, t0, xObs,
+      xTrain: trainIdx.map(i=> xObs[i]),
+      yTrain: trainIdx.map(i=> ctx.rrMs[i]),
+      nTrain: trainIdx.length,
+      // Latent x for `count` intervals spanning samples [sA, sB]
+      latentX(intervalIdx, count, sA, sB){
+        const out = [];
+        for(let j=0;j<count;j++){
+          if(useIndex){
+            out.push(intervalIdx + j);
+          }else{
+            // provisional equally spaced endpoint times (refined by the sum constraint)
+            const s = sA + (sB - sA)*(j+1)/count;
+            out.push(s/state.fs - t0);
+          }
+        }
+        return out;
+      }
+    };
+  }
+
+  function _rrBounds(){
+    const qc = state.rrQc || _readRRQcConfigFromUI();
+    return {lo: Number.isFinite(qc.absMinMs)?qc.absMinMs:250,
+            hi: Number.isFinite(qc.absMaxMs)?qc.absMaxMs:2000,
+            kernel: qc.gpKernel || 'RQ'};
+  }
+
+  function _rrSnap(channel, sample, enabled){
+    const rc = _rrCfg();
+    if(!enabled || !_rrEcgAvailable()){
+      return {index: sample, snapped:false, confidence:null,
+              reason: _rrEcgAvailable() ? 'snapping disabled' : 'no ECG waveform available'};
+    }
+    const halfWin = Math.max(2, Math.round(rc.snapWindowMs/1000*state.fs));
+    const cand = findQRSCandidate(channel, sample, halfWin);
+    if(cand && cand.confidence >= rc.snapMinConf){
+      return {index: cand.index, snapped:true, confidence: cand.confidence, reason:'QRS confirmed'};
+    }
+    return {index: sample, snapped:false, confidence: cand?cand.confidence:null,
+            reason:'no acceptable QRS candidate'};
+  }
+
+  /* ---- (1) ordinary timing artifact: annotation-consistent GP timing repair.
+     The suspicious interior peak R_i is repositioned between FIXED anchors
+     R_{i-1} and R_{i+1}; the GP jointly predicts the two intervals subject to
+     RR_{i-1} + RR_i = (R_{i+1} - R_{i-1})/fs * 1000.                        */
+  function proposeGPTimingRepair(caseId, middlePeakIdOpt){
+    const c = _rrFindCase(caseId);
+    if(!c) return {ok:false, msg:'Unknown review case.'};
+    const ctx = _rrContext();
+    if(!ctx) return {ok:false, msg:'No segment context.'};
+    const maskBad = state.rrQcLast ? state.rrQcLast.maskBad : null;
+    const b = _rrBounds();
+
+    const midId = middlePeakIdOpt || c.middlePeakId || c.rightPeakId;
+    const j = ctx.peaks.findIndex(p=> p.id === midId);
+    if(j <= 0 || j >= ctx.peaks.length-1)
+      return {ok:false, msg:'A timing repair needs a fixed R-peak on both sides.'};
+
+    const left = ctx.peaks[j-1], mid = ctx.peaks[j], right = ctx.peaks[j+1];
+    const gapMs = (right.index - left.index)/state.fs*1000;
+
+    const ax = _rrGpAxis(ctx, maskBad, [j-1, j]);
+    if(ax.nTrain < 2) return {ok:false, msg:'Need \u22652 accepted RR intervals to train the GP.'};
+    const xPred = ax.useIndex ? [j-1, j]
+                              : [ (left.index + (right.index-left.index)/2)/state.fs - ax.t0,
+                                  right.index/state.fs - ax.t0 ];
+
+    const gp = gpPredictRR(ax.xTrain, ax.yTrain, xPred, b.kernel);
+    if(!gp.ok) return {ok:false, msg: gp.msg};
+
+    const con = conditionIntervalsOnGap(gp.mean, gp.cov, gapMs, b.lo, b.hi);
+    if(!con.valid)
+      return {ok:false, msg:`Reconstructed intervals (${con.intervals.map(v=>v.toFixed(0)).join(', ')} ms) fall outside ${b.lo}\u2013${b.hi} ms.`};
+
+    let target = left.index + Math.round(con.intervals[0]*state.fs/1000);
+    const snap = _rrSnap(ctx.channel, target, c.snapToECG);
+    target = snap.index;
+
+    if(!(target > left.index && target < right.index))
+      return {ok:false, msg:'Proposed position would cross a neighbouring R-peak.'};
+
+    c.proposedIntervalsMs = [
+      (target - left.index)/state.fs*1000,
+      (right.index - target)/state.fs*1000
+    ];
+    c.proposedPeakChanges = [{action:'move', peakId: mid.id, oldIndex: mid.index, proposedIndex: target}];
+    c.gpMeta = {kernel: b.kernel, method: con.method, sdMs: (con.sdG || gp.sd).map(v=>Math.round(v*10)/10), sdConstrained: !!con.sdG,
+                centred: gp.centred, input: ax.useIndex?'interval_index':'elapsed_time_s',
+                sumErrorMs: Math.round(con.sumErrorMs*100)/100,
+                snapped: snap.snapped, qrsConfidence: snap.confidence, snapNote: snap.reason};
+    c.selectedAction = 'gp_timing';
+    state.rrRepairPreview = {caseId, action:'move_peak', addedPeaks:[], deletedPeaks:[],
+                             movedPeaks:[{peakId: mid.id, oldIndex: mid.index, proposedIndex: target}]};
+    redrawECG();
+    return {ok:true, msg:`GP timing repair: ${c.proposedIntervalsMs.map(v=>v.toFixed(0)).join(' + ')} ms = ${gapMs.toFixed(0)} ms`, meta:c.gpMeta};
+  }
+
+  /* ---- (2) missed R peak reconstruction. The local median only SUGGESTS how
+     many beats are missing; the final positions come from the GP subject to
+     sum(RR_j) = G. Nearby candidate counts are ranked.                       */
+  function proposeMissingBeatRepair(caseId, missingCountOpt){
+    const c = _rrFindCase(caseId);
+    if(!c) return {ok:false, msg:'Unknown review case.'};
+    const ctx = _rrContext();
+    if(!ctx) return {ok:false, msg:'No segment context.'};
+    const maskBad = state.rrQcLast ? state.rrQcLast.maskBad : null;
+    const b = _rrBounds();
+    const i = c.intervalIndices[0];
+    const left = ctx.peaks[i], right = ctx.peaks[i+1];
+    const G = (right.index - left.index)/state.fs*1000;
+    const M = Number.isFinite(c.localMedianMs) ? c.localMedianMs : _rrLocalMedian(ctx.rrMs, i, maskBad);
+    if(!(Number.isFinite(M) && M > 0)) return {ok:false, msg:'No robust local median available.'};
+
+    const m0 = Math.max(0, Math.round(G/M) - 1);
+    const candidates = (missingCountOpt !== undefined && missingCountOpt !== null)
+      ? [missingCountOpt]
+      : Array.from(new Set([Math.max(0, m0-1), m0, m0+1])).filter(m=> m >= 1);
+    if(!candidates.length) return {ok:false, msg:'No plausible missing-beat count for this gap.'};
+
+    const ax = _rrGpAxis(ctx, maskBad, [i]);
+    if(ax.nTrain < 2) return {ok:false, msg:'Need \u22652 accepted RR intervals to train the GP.'};
+
+    const ranked = [];
+    for(const m of candidates){
+      const nSlots = m + 1;                                   // m missing beats -> m+1 latent intervals
+      const xPred = ax.latentX(i, nSlots, left.index, right.index);
+      const gp = gpPredictRR(ax.xTrain, ax.yTrain, xPred, b.kernel);
+      if(!gp.ok) continue;
+      const con = conditionIntervalsOnGap(gp.mean, gp.cov, G, b.lo, b.hi);
+      if(!con.valid) continue;
+      // rank by agreement with the local median and by posterior uncertainty
+      const devs = con.intervals.map(v=> Math.abs(v - M)/M);
+      const sdUse = con.sdG || gp.sd;
+      const cost = devs.reduce((a,v)=>a+v,0)/devs.length + 0.15*(sdUse.reduce((a,v)=>a+v,0)/sdUse.length)/M;
+      ranked.push({m, nSlots, intervals: con.intervals, con, gp, cost});
+    }
+    if(!ranked.length) return {ok:false, msg:`No candidate count (${candidates.join(', ')}) produced physiologically valid intervals.`};
+    ranked.sort((a,b2)=> a.cost - b2.cost);
+    const bestC = ranked[0];
+
+    // Cumulative construction of the proposed R positions
+    const proposedPeaks = [];
+    let sample = left.index;
+    for (let j = 0; j < bestC.intervals.length - 1; j++) {
+      sample += Math.round(bestC.intervals[j] * state.fs / 1000);
+      proposedPeaks.push(sample);
+    }
+
+    const adds = [];
+    let prev = left.index;
+    for(const raw of proposedPeaks){
+      const snap = _rrSnap(ctx.channel, raw, c.snapToECG);
+      const idx = snap.index;
+      if(!(idx > prev && idx < right.index))
+        return {ok:false, msg:'A proposed R-peak would cross a neighbouring peak.'};
+      adds.push({
+        action:'add',
+        peak:{ id: createPeakId(), index: idx, type:'N',
+               source: snap.snapped ? 'gp_plus_ecg' : 'gp_missing_reconstruction',
+               synthetic: !snap.snapped, qrsConfirmed: !!snap.snapped, repairCaseId: c.id },
+        gpIndex: raw, qrsConfidence: snap.confidence, snapNote: snap.reason
+      });
+      prev = idx;
+    }
+
+    c.proposedIntervalsMs = bestC.intervals.slice();
+    c.proposedPeakChanges = adds;
+    c.gpMeta = {kernel:b.kernel, method:bestC.con.method, sdMs:bestC.gp.sd.map(v=>Math.round(v*10)/10),
+                centred:bestC.gp.centred, input: ax.useIndex?'interval_index':'elapsed_time_s',
+                sumErrorMs: Math.round(bestC.con.sumErrorMs*100)/100,
+                missingCount: bestC.m, medianSuggestion: m0,
+                rankedCounts: ranked.map(r=>({m:r.m, cost:Math.round(r.cost*1000)/1000})),
+                snapped: adds.some(a=>a.peak.qrsConfirmed)};
+    c.selectedAction = 'add_missing';
+    state.rrRepairPreview = {caseId, action:'add_peaks',
+                             addedPeaks: adds.map(a=>({peakId:a.peak.id, proposedIndex:a.peak.index, synthetic:a.peak.synthetic})),
+                             deletedPeaks:[], movedPeaks:[]};
+    redrawECG();
+    return {ok:true, msg:`${bestC.m} missing beat(s): ${bestC.intervals.map(v=>v.toFixed(0)).join(' + ')} ms = ${G.toFixed(0)} ms`, meta:c.gpMeta};
+  }
+
+  /* ---- (3) false-positive R peak: preview the removal and the resulting
+     combined interval. Only the selected peak is ever removed.              */
+  function proposeFalsePositiveDeletion(caseId, peakIdOpt){
+    const c = _rrFindCase(caseId);
+    if(!c) return {ok:false, msg:'Unknown review case.'};
+    const ctx = _rrContext();
+    if(!ctx) return {ok:false, msg:'No segment context.'};
+    const b = _rrBounds();
+    const pid = peakIdOpt || c.middlePeakId;
+    if(!pid) return {ok:false, msg:'Select the R-peak to delete first.'};
+    const j = ctx.peaks.findIndex(p=> p.id === pid);
+    if(j <= 0 || j >= ctx.peaks.length-1)
+      return {ok:false, msg:'Only an interior R-peak can be deleted here (a bounding peak is required on each side).'};
+
+    const left = ctx.peaks[j-1], mid = ctx.peaks[j], right = ctx.peaks[j+1];
+    const combined = (right.index - left.index)/state.fs*1000;
+    const M = _rrLocalMedian(ctx.rrMs, j, state.rrQcLast?state.rrQcLast.maskBad:null);
+    if(!(combined >= b.lo && combined <= b.hi))
+      return {ok:false, msg:`Combined interval ${combined.toFixed(0)} ms falls outside ${b.lo}\u2013${b.hi} ms; deletion rejected.`};
+    if(ctx.peaks.length - 1 < 2)
+      return {ok:false, msg:'Deletion would leave fewer than 2 R-peaks in the segment.'};
+
+    const qconf = _rrQrsConfidenceAt(ctx.channel, mid.index);
+    c.proposedIntervalsMs = [combined];
+    c.proposedPeakChanges = [{action:'delete', peakId: mid.id, oldIndex: mid.index, peakSnapshot: JSON.parse(JSON.stringify(mid))}];
+    c.gpMeta = {kernel:null, method:'structural_deletion',
+                combinedMs: Math.round(combined*10)/10,
+                localMedianMs: Number.isFinite(M) ? Math.round(M*10)/10 : null,
+                deviationFromMedian: Number.isFinite(M) ? Math.round(Math.abs(combined-M)/M*1000)/1000 : null,
+                qrsConfidence: qconf};
+    c.selectedAction = 'delete_false_positive';
+    state.rrRepairPreview = {caseId, action:'delete_peak', addedPeaks:[],
+                             deletedPeaks:[{peakId: mid.id, oldIndex: mid.index}], movedPeaks:[]};
+    redrawECG();
+    return {ok:true, msg:`Delete R@${mid.index} \u2192 combined RR ${combined.toFixed(0)} ms` +
+                         (Number.isFinite(M)?` (local median ${M.toFixed(0)} ms)`:''), meta:c.gpMeta};
+  }
+
+  /* ---- (4) misplaced R peak: identical geometry to the GP timing repair. */
+  function proposeMisplacedPeakRepair(caseId, peakIdOpt){
+    const c = _rrFindCase(caseId);
+    if(!c) return {ok:false, msg:'Unknown review case.'};
+    const res = proposeGPTimingRepair(caseId, peakIdOpt || c.middlePeakId);
+    if(res.ok){ c.selectedAction = 'move_misplaced'; }
+    return res;
+  }
+
+  /* ---- (5) retain as physiological: no annotation change at all. */
+  function acceptPhysiologicalRR(caseId, includeInHRV){
+    const c = _rrFindCase(caseId);
+    if(!c) return {ok:false, msg:'Unknown review case.'};
+    c.status          = 'reviewed';
+    c.selectedAction  = 'retain_physiological';
+    c.applied         = true;
+    c.includeInHRV    = (includeInHRV === undefined) ? c.includeInHRV : !!includeInHRV;
+    c.proposedIntervalsMs = [];
+    c.proposedPeakChanges = [];
+    // the original flag reason is deliberately preserved in c.detectionReasons
+    state.rrRepairPreview = null;
+    recalculateHRV();
+    redrawECG();
+    redrawRRTachogram();
+    renderRRReviewSummary();
+    log(`RR case ${c.id} retained as physiological (HRV: ${c.includeInHRV?'included':'excluded'}).`,'info');
+    return {ok:true, msg:'Retained as physiological.'};
+  }
+
+  /* ==========================================================================
+     STAGE 4 : APPLY  (+ full undo)
+     ========================================================================== */
+  function _rrSnapshot(channel){
+    const clone = (o)=> (typeof structuredClone === 'function') ? structuredClone(o) : JSON.parse(JSON.stringify(o));
+    return {
+      channel,
+      peaksBefore:      clone(state.peaks.R[channel] || []),
+      rrCasesBefore:    clone(state.rrCases || []),
+      rrAnalysisBefore: clone(state.rrQcLast || {}),
+      rrCorrectionBefore: clone(state.rrCorrection),
+      gpKernelBefore:   (state.rrQc && state.rrQc.gpKernel) || 'RQ',
+      gpParamsBefore:   _rrCollectGPParams(),
+      reviewCfgBefore:  clone(state.rrReviewCfg),
+      timestamp: Date.now()
+    };
+  }
+
+  function _rrCollectGPParams(){
+    const out = {};
+    document.querySelectorAll('.gp-slider').forEach(sl=>{ out[sl.id] = sl.value; });
+    return out;
+  }
+
+  function _rrValidateAnnotations(channel){
+    const arr = state.peaks.R[channel] || [];
+    const idx = arr.map(p=>p.index);
+    for(let i=0;i<idx.length;i++){
+      if(!Number.isFinite(idx[i]) || idx[i] < 0) return 'Non-finite or negative R-peak index.';
+      if(i>0 && idx[i] <= idx[i-1]) return 'R-peak indices are not strictly increasing / unique.';
+    }
+    const ids = arr.map(p=>p.id);
+    if(new Set(ids).size !== ids.length) return 'Duplicate R-peak identifiers.';
+    return null;
+  }
+
+  function applyRRRepair(caseId){
+    const c = _rrFindCase(caseId);
+    if(!c) return {ok:false, msg:'Unknown review case.'};
+    if(!c.proposedPeakChanges || !c.proposedPeakChanges.length)
+      return {ok:false, msg:'Nothing to apply \u2014 build a proposal first.'};
+    const ch = c.channel;
+
+    // Snapshot BEFORE any structural change so undo is always possible
+    const snap = _rrSnapshot(ch);
+
+    const arr = state.peaks.R[ch] || (state.peaks.R[ch] = []);
+    const before = arr.map(p=>p.index).slice();
+
+    try{
+      for(const chg of c.proposedPeakChanges){
+        if(chg.action === 'add'){
+          arr.push(chg.peak);
+        } else if(chg.action === 'delete'){
+          const k = arr.findIndex(p=> p.id === chg.peakId);
+          if(k < 0) throw new Error('Peak to delete no longer exists.');
+          arr.splice(k,1);
+        } else if(chg.action === 'move'){
+          const p = arr.find(q=> q.id === chg.peakId);
+          if(!p) throw new Error('Peak to move no longer exists.');
+          chg.oldIndex = p.index;
+          p.index = chg.proposedIndex;
+          p.source = (p.source && p.source.indexOf('gp') === 0) ? p.source : 'gp_timing_repair';
+          p.movedFrom = chg.oldIndex;
+        }
+      }
+      sortRPeaks(ch);
+      const err = _rrValidateAnnotations(ch);
+      if(err) throw new Error(err);
+    }catch(e){
+      state.peaks.R[ch] = snap.peaksBefore;   // roll back immediately
+      return {ok:false, msg:'Apply rejected: ' + (e.message || String(e))};
+    }
+
+    state.rrRepairHistory.push(snap);
+    if(state.rrRepairHistory.length > 50) state.rrRepairHistory.shift();
+
+    c.status  = 'reviewed';
+    c.applied = true;
+    state.rrRepairPreview = null;
+
+    // Annotations changed -> every cached RR correction is now stale.
+    invalidateRRCorrection('annotation edit');
+    state.annotationHistory.push({type:'RR-repair', channel: ch, caseId: c.id,
+                                  action: c.selectedAction, before, at: Date.now()});
+
+    _rrRefreshAfterStructuralChange();
+    const summary = c.proposedPeakChanges.map(x=> x.action).join(', ');
+    log(`Applied RR repair (${c.selectedAction}) on case ${c.id}: ${summary}.`,'success');
+    return {ok:true, msg:`Applied ${c.selectedAction}.`};
+  }
+
+  function undoLastRRRepair(){
+    const snap = state.rrRepairHistory.pop();
+    if(!snap) return {ok:false, msg:'Nothing to undo.'};
+    state.peaks.R[snap.channel] = snap.peaksBefore;
+    state.rrCases      = snap.rrCasesBefore;
+    state.rrQcLast     = snap.rrAnalysisBefore;
+    state.rrCorrection = snap.rrCorrectionBefore || null;
+    state.rrReviewCfg  = snap.reviewCfgBefore || state.rrReviewCfg;
+    if(snap.gpParamsBefore){
+      for(const [id,v] of Object.entries(snap.gpParamsBefore)){
+        const el = document.getElementById(id);
+        if(el){ el.value = v; el.dispatchEvent(new Event('input')); }
+      }
+    }
+    const kSel = document.getElementById('gpKernel');
+    if(kSel && snap.gpKernelBefore){ kSel.value = snap.gpKernelBefore; kSel.dispatchEvent(new Event('change')); }
+    state.rrRepairPreview = null;
+    ensureRPeakMeta(snap.channel);
+    sortRPeaks(snap.channel);
+    _rrRefreshAfterStructuralChange(true);
+    log('Undid last RR correction.','warning');
+    return {ok:true, msg:'Undo complete.'};
+  }
+
+  /* ==========================================================================
+     RECALCULATION PIPELINE  (§11)
+     ========================================================================== */
+  function recalculateRRFromRPeaks(){
+    const ctx = _rrContext();
+    return ctx ? ctx.rrMs : [];
+  }
+  function rebuildRRReviewCases(){ return buildRRReviewCases(); }
+  function recalculateHRV(){ try{ updateHRVPanel(); }catch(_e){} }
+  function redrawECG(){ try{ drawCurrentChannel(); }catch(_e){} }
+  function redrawRRTachogram(){ try{ computeStats(); }catch(_e){} renderRRReviewSummary(); }
+
+  function _rrRefreshAfterStructuralChange(skipRebuild){
+    sortRPeaks();
+    recalculateRRFromRPeaks();
+    if(!skipRebuild) rebuildRRReviewCases();
+    recalculateHRV();
+    redrawECG();
+    redrawRRTachogram();
+    try{ updateBadges(); }catch(_e){}
+  }
+
+  // Any of these events must invalidate cached GP corrections.
+  ['selChannel','fsInput','selMode'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change', ()=> invalidateRRCorrection('context change'));
+  });
+
+  /* ==========================================================================
+     §12  HRV INPUT SERIES
+     Returns an RR series that PRESERVES SEQUENCE POSITION: excluded intervals
+     become NaN instead of being removed, so successive-difference metrics can
+     never treat non-adjacent intervals as neighbours.
+     ========================================================================== */
+  function buildRRAnalysisSeries(nnRawMs, maskBad){
+    const out = nnRawMs.slice();
+    const cases = state.rrCases || [];
+
+    // Case decisions apply only when the cases describe THIS exact RR sequence.
+    const aligned = state.rrQcLast && Array.isArray(state.rrQcLast.rrRawMs)
+      && state.rrQcLast.rrRawMs.length === nnRawMs.length
+      && state.rrQcLast.rrRawMs.every((v,i)=> Math.abs(v - nnRawMs[i]) < 1e-6);
+
+    const decided = new Set();
+    if(aligned){
+      for(const c of cases){
+        for(const i of c.intervalIndices){
+          if(i < 0 || i >= out.length) continue;
+          if(c.status === 'reviewed' || c.applied){
+            decided.add(i);
+            // Reviewed intervals keep their annotation-derived value unless the
+            // user excluded them from NN/HRV analysis. "Physiological" and
+            // "included in NN analysis" are independent decisions.
+            if(!c.includeInHRV) out[i] = NaN;
+          }
+        }
+      }
+    }
+    // Everything still flagged and unreviewed is excluded (as a missing value).
+    for(let i=0;i<out.length;i++){
+      if(maskBad && maskBad[i] && !decided.has(i)) out[i] = NaN;
+      if(!Number.isFinite(out[i]) || out[i] <= 0) out[i] = NaN;
+    }
+    return out;
+  }
+
+  // Successive differences over ORIGINALLY ADJACENT valid pairs only.
+  function successiveDifferences(rrAnalysisMs){
+    const differences = [];
+    for (let i = 1; i < rrAnalysisMs.length; i++) {
+      const previous = rrAnalysisMs[i - 1];
+      const current  = rrAnalysisMs[i];
+      if (
+        Number.isFinite(previous) &&
+        previous > 0 &&
+        Number.isFinite(current) &&
+        current > 0
+      ) {
+        differences.push(current - previous);
+      }
+    }
+    return differences;
+  }
+
+  /* ==========================================================================
+     §3  OVERLAY RENDERING
+     The original R-peak marker (and its beat-type colour) is never replaced.
+     RR status is shown as a HOLLOW RING plus a coloured segment spanning the
+     interval, because an RR interval is not a single point.
+     ========================================================================== */
+  const RR_RING = {
+    unreviewed:    {c:'#f59e0b', label:'flagged \u2013 unreviewed'},
+    gp_timing:     {c:'#3b82f6', label:'GP timing correction applied'},
+    add_missing:   {c:'#06b6d4', label:'missing R-peak inserted'},
+    false_positive:{c:'#fb923c', label:'suspected false-positive R-peak'},
+    misplaced:     {c:'#d946ef', label:'suspected misplaced R-peak'},
+    retained:      {c:'#22c55e', label:'reviewed \u2013 retained as physiological'},
+    preview:       {c:'#64748b', label:'preview (not applied)'}
+  };
+
+  function _rrCaseRingKey(c){
+    if(c.applied || c.status === 'reviewed'){
+      if(c.selectedAction === 'retain_physiological') return 'retained';
+      if(c.selectedAction === 'add_missing')          return 'add_missing';
+      if(c.selectedAction === 'delete_false_positive')return 'false_positive';
+      if(c.selectedAction === 'move_misplaced')       return 'misplaced';
+      return 'gp_timing';
+    }
+    if(c.suggestedType === 'false_positive')  return 'false_positive';
+    if(c.suggestedType === 'misplaced_peak')  return 'misplaced';
+    return 'unreviewed';
+  }
+
+  function _rrHoverText(c, ctx){
+    const raw = c.rawIntervalsMs.map(v=>v.toFixed(0)).join(' + ');
+    const cor = c.proposedIntervalsMs.length ? c.proposedIntervalsMs.map(v=>v.toFixed(0)).join(' + ')
+              : (c.applied && c.selectedAction === 'retain_physiological' ? raw + ' (unchanged)' : '\u2014');
+    const g   = c.gpMeta || {};
+    const mid = c.middlePeakId ? _rrPeakById(c.channel, c.middlePeakId) : null;
+    const qrs = mid ? (mid.qrsConfirmed ? 'confirmed' : 'not confirmed (synthetic)')
+                    : (g.qrsConfidence != null ? `${(g.qrsConfidence*100).toFixed(0)}%` : '\u2014');
+    return [
+      `Raw RR: ${raw} ms`,
+      `Corrected RR: ${cor} ms`,
+      `Correction type: ${c.selectedAction || ('suggested: ' + c.suggestedType)}`,
+      `GP kernel: ${g.kernel || '\u2014'}`,
+      `GP uncertainty: ${g.sdMs ? '\u00b1' + g.sdMs.join('/') + ' ms' : '\u2014'}`,
+      `Review status: ${c.status}${c.applied?' / applied':''}`,
+      `QRS confirmation: ${qrs}`,
+      `Reasons: ${c.detectionReasons.join(', ') || '\u2014'}`
+    ].join('<br>');
+  }
+
+  // Called from drawCurrentChannel(); returns extra Plotly traces.
+  function buildRRReviewTraces(channelIdx, sig){
+    const traces = [];
+    const cases = (state.rrCases||[]).filter(c=> String(c.channel) === String(channelIdx));
+    const at = (s)=> (s>=0 && s<sig.length && Number.isFinite(sig[s])) ? sig[s] : null;
+
+    // --- synthetic (non QRS-confirmed) peaks are visibly distinguished
+    const syn = (state.peaks.R[channelIdx]||[]).filter(p=> p.synthetic);
+    if(syn.length){
+      const xs=[], ys=[], ht=[];
+      for(const p of syn){ const y=at(p.index); if(y===null) continue; xs.push(p.index); ys.push(y);
+        ht.push(`Synthetic R @ ${p.index}<br>source: ${p.source}<br>QRS confirmed: no`); }
+      if(xs.length) traces.push({x:idxArrToDisplayX(xs), y:ys, type:'scatter', mode:'markers', name:'R (synthetic)',
+        marker:{symbol:'x-thin-open', size:14, color:'#0ea5e9', line:{width:2.5, color:'#0ea5e9'}},
+        hovertext:ht, hoverinfo:'text', showlegend:false});
+    }
+
+    // --- rings + interval segments, grouped by status colour
+    const byKey = {};
+    const segX = {}, segY = {}, segHT = {};
+    for(const c of cases){
+      const key = _rrCaseRingKey(c);
+      const L = _rrPeakById(c.channel, c.leftPeakId);
+      const R = _rrPeakById(c.channel, c.rightPeakId);
+      const target = c.middlePeakId ? _rrPeakById(c.channel, c.middlePeakId) : R;
+      const hover = _rrHoverText(c);
+
+      if(target){
+        const y = at(target.index);
+        if(y !== null){
+          (byKey[key] = byKey[key] || {x:[],y:[],ht:[],ids:[]});
+          byKey[key].x.push(target.index); byKey[key].y.push(y);
+          byKey[key].ht.push(hover); byKey[key].ids.push(c.id);
+        }
+      }
+      if(L && R){
+        const yL = at(L.index), yR = at(R.index);
+        if(yL !== null && yR !== null){
+          segX[key] = segX[key] || []; segY[key] = segY[key] || []; segHT[key] = segHT[key] || [];
+          segX[key].push(L.index, R.index, null);
+          segY[key].push(yL, yR, null);
+          segHT[key].push(hover, hover, '');
+        }
+      }
+    }
+    for(const [key, pts] of Object.entries(segX)){
+      traces.push({x:idxArrToDisplayX(pts), y:segY[key], type:'scatter', mode:'lines', name:'RR '+RR_RING[key].label,
+        line:{color:RR_RING[key].c, width:3, dash:'solid'}, opacity:0.75,
+        hovertext:segHT[key], hoverinfo:'text', showlegend:false});
+    }
+    for(const [key, g] of Object.entries(byKey)){
+      traces.push({x:idxArrToDisplayX(g.x), y:g.y, type:'scatter', mode:'markers', name:'RR '+RR_RING[key].label,
+        marker:{symbol:'circle-open', size:18, color:RR_RING[key].c, line:{width:3, color:RR_RING[key].c}},
+        hovertext:g.ht, hoverinfo:'text', customdata:g.ids, showlegend:false});
+    }
+
+    // --- uncommitted preview overlay (does NOT touch the annotation list)
+    const pv = state.rrRepairPreview;
+    if(pv){
+      const px=[], py=[], pht=[];
+      for(const a of (pv.addedPeaks||[])){ const y=at(a.proposedIndex); if(y===null) continue;
+        px.push(a.proposedIndex); py.push(y); pht.push(`PREVIEW \u2013 add R @ ${a.proposedIndex}${a.synthetic?' (synthetic)':''}`); }
+      for(const m of (pv.movedPeaks||[])){ const y=at(m.proposedIndex); if(y===null) continue;
+        px.push(m.proposedIndex); py.push(y); pht.push(`PREVIEW \u2013 move R ${m.oldIndex} \u2192 ${m.proposedIndex}`); }
+      if(px.length) traces.push({x:idxArrToDisplayX(px), y:py, type:'scatter', mode:'markers', name:'RR preview',
+        marker:{symbol:'diamond-open', size:16, color:RR_RING.preview.c, line:{width:3, color:RR_RING.preview.c}},
+        hovertext:pht, hoverinfo:'text', showlegend:false});
+      const dx=[], dy=[], dht=[];
+      for(const d of (pv.deletedPeaks||[])){ const y=at(d.oldIndex); if(y===null) continue;
+        dx.push(d.oldIndex); dy.push(y); dht.push(`PREVIEW \u2013 delete R @ ${d.oldIndex}`); }
+      if(dx.length) traces.push({x:idxArrToDisplayX(dx), y:dy, type:'scatter', mode:'markers', name:'RR preview delete',
+        marker:{symbol:'x-open', size:18, color:'#ef4444', line:{width:3, color:'#ef4444'}},
+        hovertext:dht, hoverinfo:'text', showlegend:false});
+    }
+    return traces;
+  }
+
+  /* ==========================================================================
+     §13  COMPACT SUMMARY + DETAILS  and  §2  REVIEW PANEL
+     ========================================================================== */
+  function _rrCounts(){
+    const cs = state.rrCases||[];
+    let reviewed=0, corrected=0, added=0, deleted=0, retained=0;
+    for(const c of cs){
+      if(c.status === 'reviewed') reviewed++;
+      if(!c.applied) continue;
+      if(c.selectedAction === 'gp_timing' || c.selectedAction === 'move_misplaced') corrected++;
+      if(c.selectedAction === 'add_missing') added += (c.proposedPeakChanges||[]).length;
+      if(c.selectedAction === 'delete_false_positive') deleted += (c.proposedPeakChanges||[]).length;
+      if(c.selectedAction === 'retain_physiological') retained++;
+    }
+    return {total: cs.length, reviewed, corrected, added, deleted, retained};
+  }
+
+  function renderRRReviewSummary(){
+    const el = document.getElementById('rrReviewSummary');
+    if(!el) return;
+    const k = _rrCounts();
+    el.innerHTML = `Reviewed ${k.reviewed}/${k.total} | Corrected ${k.corrected} | Added ${k.added} | Deleted ${k.deleted} | Retained ${k.retained} ` +
+                   `<a href="#" id="rrDetailsLink" style="color:#3b82f6;text-decoration:underline">Details\u2026</a>`;
+    const link = document.getElementById('rrDetailsLink');
+    if(link) link.addEventListener('click', (e)=>{ e.preventDefault(); openRRDetails(); });
+  }
+
+  function _rrDetailRows(){
+    return (state.rrCases||[]).map(c=>{
+      const g = c.gpMeta||{};
+      const mid = c.middlePeakId ? _rrPeakById(c.channel, c.middlePeakId) : null;
+      const peakAction = (c.proposedPeakChanges||[]).map(x=>x.action).join('+') || (c.selectedAction==='retain_physiological'?'none':'\u2014');
+      return {
+        case: c.id,
+        type: c.selectedAction || c.suggestedType,
+        rawRR: c.rawIntervalsMs.map(v=>v.toFixed(0)).join('+'),
+        correctedRR: c.proposedIntervalsMs.length ? c.proposedIntervalsMs.map(v=>v.toFixed(0)).join('+') : '\u2014',
+        peakAction,
+        kernel: g.kernel || '\u2014',
+        uncertainty: g.sdMs ? ('\u00b1'+g.sdMs.join('/')+' ms') : '\u2014',
+        qrsConfirmed: mid ? (mid.qrsConfirmed?'yes':'no') : (g.snapped===undefined?'\u2014':(g.snapped?'yes':'no')),
+        includedInHRV: c.includeInHRV ? 'yes':'no',
+        status: c.status + (c.applied?' / applied':''),
+        reasons: c.detectionReasons.join(';'),
+        score: c.suggestionScore
+      };
+    });
+  }
+
+  function openRRDetails(){
+    const rows = _rrDetailRows();
+    const head = ['Case','Type','Raw RR','Corrected RR','Peak action','Kernel','Uncertainty','QRS confirmed','Included in HRV','Status'];
+    const keys = ['case','type','rawRR','correctedRR','peakAction','kernel','uncertainty','qrsConfirmed','includedInHRV','status'];
+    const body = rows.length
+      ? rows.map(r=> '<tr>'+keys.map(k=>`<td style="padding:4px 8px;border-bottom:1px solid var(--border)">${r[k]}</td>`).join('')+'</tr>').join('')
+      : '<tr><td colspan="10" style="padding:10px">No review cases in the current segment.</td></tr>';
+    _rrModal('RR correction details',
+      `<div style="overflow:auto"><table style="border-collapse:collapse;font-size:11px;width:100%">
+        <thead><tr>${head.map(h=>`<th style="text-align:left;padding:4px 8px;border-bottom:2px solid var(--border);white-space:nowrap">${h}</th>`).join('')}</tr></thead>
+        <tbody>${body}</tbody></table></div>`);
+  }
+
+  function _rrModal(title, html){
+    let ov = document.getElementById('rrModalOverlay');
+    if(!ov){
+      ov = document.createElement('div');
+      ov.id = 'rrModalOverlay';
+      ov.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;align-items:center;justify-content:center';
+      ov.innerHTML = '<div id="rrModalBox" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:760px;width:94%;max-height:84vh;display:flex;flex-direction:column;overflow:hidden">'
+        + '<header style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:14px;color:var(--text)">'
+        + '<span id="rrModalTitle"></span><button id="rrModalClose" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">\u2715</button></header>'
+        + '<div id="rrModalBody" style="overflow-y:auto;padding:14px 16px;font-size:12px;color:var(--text)"></div></div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', e=>{ if(e.target === ov) ov.style.display='none'; });
+      ov.querySelector('#rrModalClose').addEventListener('click', ()=>{ ov.style.display='none'; });
+    }
+    ov.querySelector('#rrModalTitle').textContent = title;
+    ov.querySelector('#rrModalBody').innerHTML = html;
+    ov.style.display = 'flex';
+    return ov;
+  }
+
+  // ---- the per-case review panel (§2) ----
+  function openRRReviewPanel(caseId){
+    const c = _rrFindCase(caseId);
+    if(!c){ _showRRQcStatus('Review case not found \u2014 run "Detect RR outliers" again.','warning'); return; }
+    const rc = _rrCfg();
+    const g  = c.gpMeta || {};
+    const ecg = _rrEcgAvailable();
+    const raw = c.rawIntervalsMs.map(v=>v.toFixed(0)).join(' + ');
+    const cor = c.proposedIntervalsMs.length ? c.proposedIntervalsMs.map(v=>v.toFixed(0)).join(' + ') : '\u2014';
+
+    const html = `
+      <div style="display:grid;grid-template-columns:150px 1fr;gap:4px 10px;margin-bottom:10px">
+        <div style="color:var(--muted)">Case</div><div>${c.id} (channel ${state.channelNames[c.channel]||c.channel})</div>
+        <div style="color:var(--muted)">Raw RR</div><div>${raw} ms</div>
+        <div style="color:var(--muted)">Local median</div><div>${Number.isFinite(c.localMedianMs)?c.localMedianMs.toFixed(0)+' ms':'\u2014'}</div>
+        <div style="color:var(--muted)">Detection reasons</div><div>${c.detectionReasons.join(', ')||'\u2014'}</div>
+        <div style="color:var(--muted)">Suggested interpretation</div><div><b>${c.suggestedType}</b> \u2014 ${c.suggestionDetail}</div>
+        <div style="color:var(--muted)">Confidence</div><div>${(c.suggestionScore*100).toFixed(0)}%</div>
+        <div style="color:var(--muted)">Proposed RR</div><div id="rrPvRR">${cor} ms</div>
+        <div style="color:var(--muted)">GP</div><div id="rrPvGP">${g.kernel?`${g.kernel}, ${g.method}, \u00b1${(g.sdMs||[]).join('/')} ms, sum error ${g.sumErrorMs} ms`:'\u2014'}</div>
+        <div style="color:var(--muted)">Status</div><div>${c.status}${c.applied?' / applied':''}</div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:10px">
+        <div style="color:var(--muted);margin-bottom:6px">Actions</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <button class="btn rr-act" data-act="gp_timing">Correct timing with GP</button>
+          <button class="btn rr-act" data-act="add_missing">Add missing R peak(s)</button>
+          <button class="btn rr-act" data-act="delete_fp">Delete false-positive R peak</button>
+          <button class="btn rr-act" data-act="move_misplaced">Move misplaced R peak</button>
+          <button class="btn rr-act" data-act="retain">Retain as physiological</button>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;display:flex;flex-direction:column;gap:5px">
+        <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="rrOptSnap" ${c.snapToECG&&ecg?'checked':''} ${ecg?'':'disabled'}>
+          Snap proposed R positions to nearby ECG QRS candidates ${ecg?'':'<span style="color:var(--muted)">(no ECG waveform \u2014 disabled)</span>'}</label>
+        <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="rrOptPreview" ${rc.previewFirst?'checked':''}>
+          Preview annotation changes before applying</label>
+        <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="rrOptHRV" ${c.includeInHRV?'checked':''}>
+          Include in HRV / NN analysis</label>
+      </div>
+      <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn" id="rrBtnPreview">Preview</button>
+        <button class="btn accent" id="rrBtnApply">Apply</button>
+        <button class="btn warn" id="rrBtnUndo">Undo last RR correction</button>
+      </div>
+      <div id="rrPanelMsg" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>`;
+
+    const ov = _rrModal('RR review', html);
+    const msg = (t, bad)=>{ const m = ov.querySelector('#rrPanelMsg'); if(m){ m.textContent = t; m.style.color = bad?'#ef4444':'var(--muted)'; } };
+
+    ov.querySelector('#rrOptSnap').addEventListener('change', e=>{ c.snapToECG = e.target.checked; });
+    ov.querySelector('#rrOptPreview').addEventListener('change', e=>{ state.rrReviewCfg.previewFirst = e.target.checked; });
+    ov.querySelector('#rrOptHRV').addEventListener('change', e=>{ c.includeInHRV = e.target.checked; recalculateHRV(); redrawRRTachogram(); });
+
+    const runProposal = (act)=>{
+      let r;
+      if(act === 'gp_timing')      r = proposeGPTimingRepair(c.id);
+      else if(act === 'add_missing') r = proposeMissingBeatRepair(c.id, c.candidateMissing);
+      else if(act === 'delete_fp')   r = proposeFalsePositiveDeletion(c.id, c.middlePeakId);
+      else if(act === 'move_misplaced') r = proposeMisplacedPeakRepair(c.id, c.middlePeakId);
+      else if(act === 'retain'){ r = acceptPhysiologicalRR(c.id, c.includeInHRV); }
+      if(r && r.ok){
+        const gm = c.gpMeta||{};
+        const pv = ov.querySelector('#rrPvRR'); if(pv) pv.textContent = (c.proposedIntervalsMs.map(v=>v.toFixed(0)).join(' + ')||'\u2014')+' ms';
+        const pg = ov.querySelector('#rrPvGP'); if(pg) pg.textContent = gm.kernel?`${gm.kernel}, ${gm.method}, \u00b1${(gm.sdMs||[]).join('/')} ms, sum error ${gm.sumErrorMs} ms`:(gm.method||'\u2014');
+        msg(r.msg, false);
+      } else msg((r&&r.msg)||'Proposal failed.', true);
+      return r;
+    };
+
+    ov.querySelectorAll('.rr-act').forEach(b=> b.addEventListener('click', ()=>{
+      const act = b.dataset.act;
+      const r = runProposal(act);
+      if(act !== 'retain' && r && r.ok && !state.rrReviewCfg.previewFirst){
+        const ar = applyRRRepair(c.id);
+        msg(ar.msg, !ar.ok);
+      }
+    }));
+    ov.querySelector('#rrBtnPreview').addEventListener('click', ()=>{
+      const act = c.selectedAction === 'delete_false_positive' ? 'delete_fp'
+                : c.selectedAction === 'add_missing' ? 'add_missing'
+                : c.selectedAction === 'move_misplaced' ? 'move_misplaced' : 'gp_timing';
+      runProposal(act);
+    });
+    ov.querySelector('#rrBtnApply').addEventListener('click', ()=>{
+      const r = applyRRRepair(c.id);
+      msg(r.msg, !r.ok);
+      if(r.ok) renderRRReviewSummary();
+    });
+    ov.querySelector('#rrBtnUndo').addEventListener('click', ()=>{
+      const r = undoLastRRRepair();
+      msg(r.msg, !r.ok);
+      renderRRReviewSummary();
+    });
+  }
+
+  // Clicking a flagged marker or its interval opens the review panel.
+  function _rrHandlePlotClickForReview(data){
+    if(!data || !data.points || !data.points.length) return false;
+    for(const pt of data.points){
+      if(pt.data && Array.isArray(pt.data.customdata) && pt.data.name && pt.data.name.indexOf('RR ') === 0){
+        const id = pt.data.customdata[pt.pointNumber];
+        if(id){ openRRReviewPanel(id); return true; }
+      }
+    }
+    // fall back: nearest flagged case within 60 samples
+    const xIdx = displayXToIdx(data.points[0].x);
+    let best=null, bd=Infinity;
+    for(const c of (state.rrCases||[])){
+      const p = _rrPeakById(c.channel, c.middlePeakId || c.rightPeakId);
+      if(!p) continue;
+      const d = Math.abs(p.index - xIdx);
+      if(d < bd){ bd = d; best = c; }
+    }
+    if(best && bd < 60){ openRRReviewPanel(best.id); return true; }
+    return false;
+  }
+
+  /* ==========================================================================
+     REVIEW UI: threshold controls, compact summary, button re-wiring
+     ========================================================================== */
+  (function initRRReviewUI(){
+    // ---- 1. Unconditionally detach the legacy destructive handlers ---------
+    // Replacing the nodes drops their old listeners, so the previous
+    // auto-insert / auto-delete / blind-RR-overwrite paths can no longer fire
+    // even if the panel markup below is missing.
+    const replace = (id, label, title, handler, cls)=>{
+      const old = document.getElementById(id);
+      if(!old) return null;
+      const fresh = old.cloneNode(false);
+      fresh.textContent = label;
+      if(title) fresh.title = title;
+      if(cls) fresh.className = cls;
+      old.parentNode.replaceChild(fresh, old);
+      fresh.addEventListener('click', handler);
+      return fresh;
+    };
+
+    replace('btnRRDetect', 'Detect RR outliers',
+      'Stage 1+2: flag suspicious RR intervals and generate structural suggestions. No annotation is modified.',
+      ()=>{
+        try{
+          const r = buildRRReviewCases();
+          if(!r.ok){ _showRRQcStatus(r.msg,'warning'); }
+          else{
+            const n = r.cases.length;
+            _setRRQcText('rrFlaggedCount', String(n));
+            _setRRQcText('rrCorrectionInfo', n ? 'Flagged \u2014 awaiting review' : 'None flagged');
+            _showRRQcStatus(`Flagged ${n}/${r.ctx.rrMs.length} RR \u2014 click a ring to review`, n?'warning':'success');
+          }
+          redrawECG(); renderRRReviewSummary(); recalculateHRV();
+        }catch(e){
+          console.error('RR detection failed', e);
+          _showRRQcStatus('RR detection failed: '+(e.message||String(e)),'error');
+        }
+      }, 'btn');
+
+    replace('btnRRCorrect', 'Review flagged RR\u2026',
+      'Open the review panel for the next unreviewed RR case.',
+      ()=>{
+        try{
+          if(!(state.rrCases||[]).length) buildRRReviewCases();
+          const next = (state.rrCases||[]).find(c=> c.status !== 'reviewed') || (state.rrCases||[])[0];
+          if(!next){ _showRRQcStatus('No flagged RR intervals to review.','success'); return; }
+          openRRReviewPanel(next.id);
+        }catch(e){
+          console.error('RR review failed', e);
+          _showRRQcStatus('RR review failed: '+(e.message||String(e)),'error');
+        }
+      }, 'btn accent');
+
+    replace('btnRRRemoveFlagged', 'RR correction details\u2026',
+      'Per-case summary of every RR correction in this segment.',
+      ()=> openRRDetails(), 'btn');
+
+    // ---- 2. Inject the review controls -------------------------------------
+    const anchor = document.getElementById('rrCorrectionInfo');
+    const grid = anchor ? anchor.closest('.rrqc-grid') : null;
+    if(!grid || !grid.parentNode){
+      console.warn('RR review panel anchor not found; legacy buttons were still re-wired.');
+      return;
+    }
+
+    const box = document.createElement('div');
+    box.className = 'rr-review-box';
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="font-weight:600;font-size:12px">RR review &amp; correction</div>
+        <div id="rrReviewSummary" style="font-size:11px;color:var(--muted)">Reviewed 0/0 | Corrected 0 | Added 0 | Deleted 0 | Retained 0</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <button id="btnRRReviewNext" class="btn accent" style="font-size:12px">Review flagged RR\u2026</button>
+        <button id="btnRRUndo" class="btn warn" style="font-size:12px">Undo last RR correction</button>
+        <button id="btnRRThresholds" class="btn" style="font-size:12px">Structural thresholds \u25be</button>
+      </div>
+      <div id="rrThresholdPanel" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+          Structural detection thresholds. M = robust local median of surrounding accepted RR intervals.
+        </div>
+        <div class="rrqc-grid">
+          <div><label title="Misplaced: each side must deviate from M by more than alpha">Misplaced &alpha;</label>
+            <input id="rrCfgAlpha" type="number" step="0.01" min="0.01" max="1" value="0.20" style="width:100px"></div>
+          <div><label title="Misplaced: |(L+R)-2M|/2M must be below beta">Misplaced &beta;</label>
+            <input id="rrCfgBetaMis" type="number" step="0.01" min="0.01" max="1" value="0.15" style="width:100px"></div>
+          <div><label title="False positive: |(L+R)-M|/M must be below beta">False-pos &beta;</label>
+            <input id="rrCfgBetaFp" type="number" step="0.01" min="0.01" max="1" value="0.20" style="width:100px"></div>
+          <div><label title="False positive: both sides must be shorter than gamma*M">False-pos &gamma;</label>
+            <input id="rrCfgGammaFp" type="number" step="0.01" min="0.1" max="1" value="0.85" style="width:100px"></div>
+          <div><label title="Gap/M above which a missing beat is considered">Missing gap ratio</label>
+            <input id="rrCfgMissRatio" type="number" step="0.05" min="1.1" max="5" value="1.55" style="width:100px"></div>
+          <div><label title="Half-window (intervals) used for the robust local median">Local median half-window</label>
+            <input id="rrCfgLocalWin" type="number" step="1" min="2" max="60" value="8" style="width:100px"></div>
+          <div><label title="Half-width of the QRS search window when snapping">Snap window (ms)</label>
+            <input id="rrCfgSnapWin" type="number" step="10" min="20" max="500" value="150" style="width:100px"></div>
+          <div><label title="Minimum QRS confidence required before snapping">Snap min confidence</label>
+            <input id="rrCfgSnapConf" type="number" step="0.05" min="0" max="1" value="0.35" style="width:100px"></div>
+          <div><label title="GP regressor input axis">GP input</label>
+            <select id="rrCfgGpInput" style="width:150px">
+              <option value="time">Elapsed time (s)</option>
+              <option value="index" selected>RR ordinal interval index</option>
+            </select></div>
+          <div style="display:flex;align-items:flex-end">
+            <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)">
+              <input id="rrCfgGpCentre" type="checkbox" checked> Centre GP on training mean</label></div>
+          <div style="display:flex;align-items:flex-end">
+            <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)">
+              <input id="rrCfgSnapDefault" type="checkbox" checked> Snap to QRS by default</label></div>
+          <div style="display:flex;align-items:flex-end">
+            <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)">
+              <input id="rrCfgPreviewFirst" type="checkbox" checked> Preview before applying</label></div>
+        </div>
+      </div>`;
+    grid.parentNode.insertBefore(box, grid.nextSibling);
+
+    const tp = document.getElementById('rrThresholdPanel');
+    document.getElementById('btnRRThresholds').addEventListener('click', ()=>{
+      tp.style.display = (tp.style.display === 'none') ? 'block' : 'none';
+    });
+
+    const bind = (id, key, kind)=>{
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.addEventListener('change', ()=>{
+        state.rrReviewCfg[key] = (kind === 'bool') ? el.checked
+                               : (kind === 'str') ? el.value : Number(el.value);
+        invalidateRRCorrection('threshold change');
+        try{ buildRRReviewCases(); redrawECG(); renderRRReviewSummary(); }catch(_e){}
+      });
+    };
+    bind('rrCfgAlpha','alpha');           bind('rrCfgBetaMis','betaMis');
+    bind('rrCfgBetaFp','betaFp');         bind('rrCfgGammaFp','gammaFp');
+    bind('rrCfgMissRatio','missingRatio');bind('rrCfgLocalWin','localWin');
+    bind('rrCfgSnapWin','snapWindowMs');  bind('rrCfgSnapConf','snapMinConf');
+    bind('rrCfgGpInput','gpInput','str'); bind('rrCfgGpCentre','gpCenter','bool');
+    bind('rrCfgSnapDefault','snapEnabled','bool');
+    bind('rrCfgPreviewFirst','previewFirst','bool');
+
+    document.getElementById('btnRRReviewNext').addEventListener('click', ()=>{
+      if(!(state.rrCases||[]).length) buildRRReviewCases();
+      const next = (state.rrCases||[]).find(c=> c.status !== 'reviewed') || (state.rrCases||[])[0];
+      if(!next){ _showRRQcStatus('No flagged RR intervals to review.','success'); return; }
+      openRRReviewPanel(next.id);
+    });
+    document.getElementById('btnRRUndo').addEventListener('click', ()=>{
+      const r = undoLastRRRepair();
+      _showRRQcStatus(r.msg, r.ok?'warning':'warning');
+      renderRRReviewSummary();
+    });
+
+    renderRRReviewSummary();
+  })();
+
+  /* ==========================================================================
+     EXPORT METADATA (§13)
+     ========================================================================== */
+  function rrCorrectionExportRows(){
+    const rows = [['case_id','channel','status','applied','selected_action','suggested_type','confidence',
+                   'detection_reasons','raw_rr_ms','corrected_rr_ms','peak_action','gp_kernel','gp_input',
+                   'gp_constraint_method','gp_uncertainty_ms','gp_sum_error_ms','qrs_confirmed','included_in_hrv']];
+
+    for(const c of (state.rrCases||[])){
+      const g = c.gpMeta||{};
+      const mid = c.middlePeakId ? _rrPeakById(c.channel, c.middlePeakId) : null;
+      rows.push([
+        c.id, c.channel, c.status, c.applied?1:0, c.selectedAction||'', c.suggestedType, c.suggestionScore,
+        c.detectionReasons.join(';'),
+        c.rawIntervalsMs.map(v=>v.toFixed(1)).join(';'),
+        c.proposedIntervalsMs.map(v=>v.toFixed(1)).join(';'),
+        (c.proposedPeakChanges||[]).map(x=>x.action).join(';'),
+        g.kernel||'', g.input||'', (g.sdMs||[]).join(';'),
+        g.method||'',                                   // constraint method
+        g.sdConstrained ? (g.sdMs||[]).join(';') : '',  // empty unless conditioned
+
+        (g.sumErrorMs===undefined?'':g.sumErrorMs),
+        mid ? (mid.qrsConfirmed?1:0) : (g.snapped===undefined?'':(g.snapped?1:0)),
+        c.includeInHRV?1:0
+      ]);
+    }
+    return rows;
+  }
+
+  function rrCorrectionExportJSON(){
+    return {
+      thresholds: Object.assign({}, state.rrReviewCfg),
+      gpConvention: {
+        rrUnitsForGP: 'seconds (rr_ms / 1000)',
+        inputAxis: state.rrReviewCfg.gpInput === 'index' ? 'RR ordinal interval index' : 'elapsed time in seconds at the second R-peak',
+        meanFunction: state.rrReviewCfg.gpCenter ? 'constant, set to the training mean (centred)' : 'zero mean',
+        kernelDefaultsPreserved: true
+      },
+      cases: (state.rrCases||[]).map(c=> JSON.parse(JSON.stringify(c))),
+      historyDepth: (state.rrRepairHistory||[]).length
+    };
+  }
+
+  // Add a downloadable per-case CSV next to the existing exports.
+  (function addRRExportButton(){
+    const host = document.getElementById('btnExportCSV');
+    if(!host || !host.parentNode) return;
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.id = 'btnExportRRCorrections';
+    b.textContent = 'Export RR corrections (CSV)';
+    b.title = 'Per-case RR review and correction metadata for the current segment.';
+    host.parentNode.insertBefore(b, host.nextSibling);
+    b.addEventListener('click', ()=>{
+      const rows = rrCorrectionExportRows();
+      const csv = rows.map(r=> r.map(x=> String(x).includes(',') ? '"'+String(x).replaceAll('"','""')+'"' : String(x)).join(',')).join('\n');
+      download('rr_corrections.csv', csv, 'text/csv');
+      log('Exported RR correction metadata (' + (rows.length-1) + ' case(s)).','success');
+    });
+  })();
+
+  // ---------- boot ----------
+  ensureAllRPeakMeta();
+  renderRRReviewSummary();
+
 </script>
 
 <!-- Changelog modal -->
@@ -5140,6 +6811,22 @@ if(btnRRRemove){
       <button id="btnCloseChangelog" title="Close">✕</button>
     </header>
     <div class="cl-body">
+      <h3><span class="tag pre">PRE-RELEASE</span> v0.2.0 — RR review &amp; annotation-consistent correction</h3>
+      <ul>
+        <li>The combined RR outlier / GP-imputation / auto-insert / auto-delete routine has been split into four explicit stages: <b>Detection → structural suggestion → preview → apply</b>. No R-peak is ever added, deleted or moved without a deliberate user action.</li>
+        <li>Every suspicious region now becomes a persistent <b>review case</b> that distinguishes an ordinary RR timing artifact, a missed R peak, a false-positive R peak, a misplaced R peak, and a true physiological interval.</li>
+        <li>New per-case review panel with <i>Correct timing with GP</i>, <i>Add missing R peak(s)</i>, <i>Delete false-positive R peak</i>, <i>Move misplaced R peak</i> and <i>Retain as physiological</i>, plus optional QRS snapping, preview, and an HRV-inclusion switch that is independent of the physiological decision.</li>
+        <li>New structural classifiers for false-positive and misplaced R peaks, with configurable thresholds (α, β, γ, gap ratio, local-median window) exposed in the UI.</li>
+        <li>Corrected RR is now <b>geometrically consistent</b> with the displayed R-peak positions: GP predicts intervals jointly inside fixed bounding peaks and the predictions are conditioned on the observed bounding duration, then peaks are repositioned and RR is re-derived from the annotations.</li>
+        <li>Missing-beat reconstruction no longer inserts equally spaced peaks: the local median only proposes a beat count, candidate counts are ranked, and positions come from the sum-constrained GP posterior.</li>
+        <li>Flagged markers redesigned. The original R-peak fill is retained and status is shown as a hollow ring plus a coloured interval segment (amber / blue / cyan / orange / magenta / green), with full hover detail.</li>
+        <li>Complete undo for all structural repairs, and cached RR corrections are invalidated on peak add/delete/move, re-detection, channel change, segment change and import.</li>
+        <li>HRV fix: excluded intervals keep their sequence position as missing values, so RMSSD, NN50, pNN50 and the Poincaré descriptors only use originally adjacent pairs.</li>
+        <li>GP defaults preserved: kernels, hyper-parameter values and RR-in-seconds convention are unchanged. GP now also reports posterior uncertainty, and is centred on the training mean (documented fix for a zero-mean posterior collapse).</li>
+        <li>New RR-correction metadata in the details view, in CSV export and in saved sessions.</li>
+        <li>Add support for unit time coordinate on the x-axis.</li>
+        <li>Updated PSD formulation.</li>
+      </ul>
       <h3><span class="tag pre">PRE-RELEASE</span> v0.1.0 — unreleased</h3>
       <ul>
         <li>First release!</li>
@@ -5150,8 +6837,8 @@ if(btnRRRemove){
 
 <!-- Footer -->
 <footer id="appFooter">
-  © 2026 CardiAnnotate — All rights reserved &nbsp;|&nbsp;
-  <a class="ver-link" id="verLink" title="View changelog">v0.1.0</a>
+  © 2026 CardioAnnotate — All rights reserved &nbsp;|&nbsp;
+  <a class="ver-link" id="verLink" title="View changelog">v0.2.0</a>
 </footer>
 
 <script>

@@ -391,7 +391,7 @@
             <li><a href="#basic-stats">7.1 Basic ECG Metrics</a></li>
             <li><a href="#sqi">7.2 Signal Quality Indices (SQI)</a></li>
             <li><a href="#hrv">7.3 Heart Rate Variability (HRV)</a></li>
-            <li><a href="#rr-correction">7.4 RR Error Detection & GP Correction</a></li>
+            <li><a href="#rr-correction">7.4 RR Error Detection & Review-Based Correction</a></li>
           </ul>
         </li>
         <li><a href="#dark-mode">8. Dark Mode</a></li>
@@ -414,7 +414,7 @@
         <li>Apply signal processing (resampling, filtering, inversion)</li>
         <li><strong>Compute Signal Quality Indices (SQI)</strong> for the visible segment</li>
         <li><strong>Compute HRV metrics</strong> (time-domain and frequency-domain) for the visible segment</li>
-        <li><strong>Detect and correct RR interval outliers</strong> using Gaussian Process regression</li>
+        <li><strong>Detect, review, and correct RR interval outliers</strong> through a suggest → preview → apply workflow with Gaussian Process regression</li>
         <li>Export annotations in JSON, CSV, WFDB, or NPZ format with enhanced options</li>
         <li><strong>Export and import full sessions</strong> in JSON, MAT, or NPZ format to restore the complete analysis state</li>
         <li>View real-time ECG statistics and intervals</li>
@@ -844,7 +844,7 @@ R,1,V1,79,0.219,N</pre>
             </thead>
             <tbody>
               <tr><td><strong>Signal data</strong></td><td>The current processed waveform for every channel and the original unmodified signal, together with sampling frequency, channel names, physical units, and record identifier. Retaining both processed and original signals keeps filtering, resampling, inversion, and reset available after reload.</td></tr>
-              <tr><td><strong>Annotations and corrections</strong></td><td>All fiducial annotations, R-peak beat-type labels, RR intervals flagged by quality control, and any RR series corrected by Gaussian Process regression.</td></tr>
+              <tr><td><strong>Annotations and corrections</strong></td><td>All fiducial annotations, R-peak beat-type labels, and the full RR review state — every flagged case, its structural suggestion and confidence, the selected/applied action, GP correction metadata, and the undo history.</td></tr>
               <tr><td><strong>Processing and analysis settings</strong></td><td>Filtering and resampling parameters, per-peak-type detector settings for Find Peaks and Pan-Tompkins, RR quality-control rules, selected GP kernel and hyperparameters, SQI parameters, and interface-control state.</td></tr>
               <tr><td><strong>View and selection</strong></td><td>The active channel and current zoom window. Because SQI and HRV are evaluated on the visible segment, saving the window fixes the exact sample range used for segment-level analysis.</td></tr>
               <tr><td><strong>Computed results</strong></td><td>A provenance snapshot of reported measures, including pSQI, kSQI, basSQI, lineSQI; time- and frequency-domain HRV metrics; the ADF stationarity test; and summary statistics.</td></tr>
@@ -867,9 +867,12 @@ R,1,V1,79,0.219,N</pre>
     "recordBase": "100"
   },
   "annotations": { ... },
-  "corrections": {
-    "flaggedRR": [...],
-    "gpCorrectedRR": [...]
+  "rrReview": {
+    "cases": [...],       // every RR case: detection reasons, suggested type,
+                           // confidence, selected/applied action, GP metadata
+    "correction": { ... },
+    "peakIdSeq": 42,
+    "metadata": { "thresholds": { ... }, "gpConvention": { ... } }
   },
   "settings": { ... },
   "view": {
@@ -897,7 +900,7 @@ R,1,V1,79,0.219,N</pre>
             <tbody>
               <tr><td>Signal data (processed + original)</td><td></td><td>✓</td><td>✓</td></tr>
               <tr><td>Peaks and beat-type labels</td><td>✓</td><td>✓</td><td>✓</td></tr>
-              <tr><td>Flagged / GP-corrected RR</td><td></td><td></td><td>✓</td></tr>
+              <tr><td>RR review cases (flags, suggestions, applied corrections)</td><td></td><td></td><td>✓</td></tr>
               <tr><td>Processing and detector settings</td><td></td><td></td><td>✓</td></tr>
               <tr><td>View / segment selection</td><td></td><td></td><td>✓</td></tr>
               <tr><td>Computed results (SQI, HRV, ADF)</td><td></td><td></td><td>✓</td></tr>
@@ -1606,11 +1609,12 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       </div>
 
       <div id="rr-correction">
-        <h3>7.4 RR Error Detection & GP Correction</h3>
-        
-        <p>CardioAnnotate includes advanced RR interval quality control using Gaussian Process (GP) regression for detecting and correcting outliers. This is essential for reliable HRV analysis.</p>
+        <h3>7.4 RR Error Detection & Review-Based Correction</h3>
 
-        <h4>Detection Modes</h4>
+        <p>CardioAnnotate flags implausible RR intervals and helps you resolve them, but no annotation is ever changed automatically. Every correction moves through four stages — <strong>detection</strong>, <strong>structural suggestion</strong>, <strong>preview</strong>, and <strong>apply</strong> — and only the final, explicit "Apply" click commits a change to the peak annotations. This review-based workflow replaces the earlier single-click "detect → auto GP-correct → auto delete" pipeline.</p>
+
+        <h4>Stage 1 — Detection</h4>
+        <p>Click <strong>"Detect RR outliers"</strong> to flag suspicious RR intervals in the visible segment. Detection only flags intervals and generates suggestions for stage 2 — it never modifies an annotation.</p>
         <table class="beat-type-table">
           <thead>
             <tr>
@@ -1643,6 +1647,81 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
           <p>When enabled (default), rate-of-change detection compares each interval to the last <em>accepted</em> value rather than the immediate predecessor. This prevents cascading rejections from a single outlier.</p>
         </div>
 
+        <h4>Stage 2 — Structural Suggestion</h4>
+        <p>Each flagged interval is automatically classified into one of five hypotheses by comparing its geometry, and that of its neighbouring intervals, to <code>M</code> — the local median of nearby accepted RR intervals. The highest-scoring hypothesis is shown in the review panel as the <strong>suggested interpretation</strong> with a confidence percentage, but it is only a suggestion: no peak or interval is changed until you choose and apply an action in stage 3–4.</p>
+        <table class="beat-type-table">
+          <thead>
+            <tr><th>Hypothesis</th><th>Geometric test</th><th>Suggested action</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Missing R-peak</strong></td><td>gap ÷ <code>M</code> exceeds the missing-gap ratio and is close to an integer multiple of <code>M</code></td><td>Add missing R peak(s)</td></tr>
+            <tr><td><strong>False positive</strong></td><td>the two intervals either side of an interior peak sum to approximately one normal interval (<code>|L+R−M|/M</code> small) and both are short relative to <code>M</code></td><td>Delete false-positive R peak</td></tr>
+            <tr><td><strong>Misplaced peak</strong></td><td>one neighbouring interval is long and the other short by more than α, but their sum is still ≈2<code>M</code></td><td>Move misplaced R peak</td></tr>
+            <tr><td><strong>Physiological</strong></td><td>interval falls within the absolute physiological limits (so is not itself implausible) but was flagged, e.g. by the rate-of-change rule</td><td>Retain as physiological</td></tr>
+            <tr><td><strong>Timing artifact</strong></td><td>fallback hypothesis used when no structural pattern fits</td><td>Correct timing with GP</td></tr>
+          </tbody>
+        </table>
+
+        <div class="feature">
+          <h4>Structural thresholds</h4>
+          <p>Click <strong>"Structural thresholds ▾"</strong> in the RR review box to adjust the parameters that drive the hypotheses above and the QRS-snapping behaviour used when applying a repair.</p>
+          <table class="beat-type-table">
+            <thead><tr><th>Parameter</th><th>Meaning</th><th>Default</th></tr></thead>
+            <tbody>
+              <tr><td>Misplaced α</td><td>minimum relative deviation each side must show from <code>M</code></td><td>0.20</td></tr>
+              <tr><td>Misplaced β</td><td>maximum relative deviation of the pair sum from 2<code>M</code></td><td>0.15</td></tr>
+              <tr><td>False-pos β</td><td>maximum relative deviation of <code>L+R</code> from <code>M</code></td><td>0.20</td></tr>
+              <tr><td>False-pos γ</td><td>each side must be shorter than γ·<code>M</code></td><td>0.85</td></tr>
+              <tr><td>Missing gap ratio</td><td>gap ÷ <code>M</code> above which a missing beat is considered</td><td>1.55</td></tr>
+              <tr><td>Local median half-window</td><td>number of intervals on each side used for the robust local median</td><td>8</td></tr>
+              <tr><td>Snap window (ms)</td><td>half-width of the QRS search window when snapping a proposed peak</td><td>150</td></tr>
+              <tr><td>Snap min confidence</td><td>minimum QRS morphology confidence required before snapping</td><td>0.35</td></tr>
+              <tr><td>GP input</td><td>GP regressor input axis — elapsed time in seconds, or ordinal interval index</td><td>elapsed time (s)</td></tr>
+              <tr><td>Centre GP on training mean</td><td>whether the GP mean function is the training-set mean (centred) or zero</td><td>on</td></tr>
+              <tr><td>Snap to QRS by default</td><td>whether newly proposed peaks are snapped to the nearest local QRS candidate</td><td>on</td></tr>
+              <tr><td>Preview before applying</td><td>whether choosing an action shows a preview overlay instead of applying immediately</td><td>on</td></tr>
+            </tbody>
+          </table>
+          <p>Changing a threshold invalidates the current cases and re-runs detection/suggestion automatically.</p>
+        </div>
+
+        <h4>Stage 3 — Preview</h4>
+        <p>Click a flagged ring marker on the ECG plot, or click <strong>"Review flagged RR…"</strong> to jump to the next unreviewed case. The review panel shows the raw RR interval(s), local median, detection reason(s), suggested interpretation and confidence, and the current proposed RR / GP metadata. Choose one of five actions:</p>
+        <table class="beat-type-table">
+          <thead><tr><th>Action</th><th>What it proposes</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Correct timing with GP</strong></td><td>Re-estimates the position of the peak between two fixed neighbours using GP regression, subject to the fixed left-to-right gap (see Stage 3 GP details below)</td></tr>
+            <tr><td><strong>Add missing R peak(s)</strong></td><td>Reconstructs 1 or more missing peaks inside the gap using GP regression, ranking candidate counts by agreement with the local median and posterior uncertainty</td></tr>
+            <tr><td><strong>Delete false-positive R peak</strong></td><td>Removes the selected interior peak and merges its two intervals into one, provided the combined interval is physiologically valid</td></tr>
+            <tr><td><strong>Move misplaced R peak</strong></td><td>Same GP-based repositioning as "Correct timing with GP", labeled separately for the misplaced-peak hypothesis</td></tr>
+            <tr><td><strong>Retain as physiological</strong></td><td>Marks the case reviewed with no annotation change; you choose whether the interval is still included in HRV/NN analysis</td></tr>
+          </tbody>
+        </table>
+        <p>Choosing an action runs the proposal and, if the <em>"Preview annotation changes before applying"</em> option is checked (default), shows it as an overlay on the plot — dashed diamonds for proposed additions/moves, an open X for a proposed deletion — without touching the committed annotation list. Uncheck the option (or use the panel's own "Preview" / "Apply" buttons) to control preview and apply separately.</p>
+
+        <div class="feature">
+          <h4>Review panel options</h4>
+          <p><strong>Snap proposed R positions to nearby ECG QRS candidates</strong> — refines a GP-proposed position to the nearest local QRS peak above the minimum confidence threshold (only available when the ECG waveform is loaded). <strong>Include in HRV / NN analysis</strong> — controls whether the interval counts toward HRV metrics regardless of the chosen action; excluded intervals become missing values in the HRV series rather than being removed, so sequence position is preserved.</p>
+        </div>
+
+        <h4>Plot Legend</h4>
+        <p>Flagged and reviewed RR cases are drawn as coloured rings and interval segments on the ECG plot:</p>
+        <table class="beat-type-table">
+          <thead><tr><th>Colour</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>Amber</td><td>flagged — unreviewed</td></tr>
+            <tr><td>Blue</td><td>GP timing correction applied</td></tr>
+            <tr><td>Cyan</td><td>missing R-peak inserted</td></tr>
+            <tr><td>Orange</td><td>suspected false-positive R-peak</td></tr>
+            <tr><td>Magenta</td><td>suspected misplaced R-peak</td></tr>
+            <tr><td>Green</td><td>reviewed — retained as physiological</td></tr>
+            <tr><td>Grey (diamond / X markers)</td><td>uncommitted preview — not yet applied</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Stage 4 — Apply and Undo</h4>
+        <p>Click <strong>"Apply"</strong> in the review panel to commit the previewed change to the peak annotations, recompute HRV/SQI, and record the case as reviewed. Every apply is snapshotted, so <strong>"Undo last RR correction"</strong> fully reverts the most recent applied case — peaks, case status, and GP/kernel/review settings — one step at a time.</p>
+
         <h4>Gaussian Process Kernels</h4>
         <p>Choose a GP kernel for RR interval interpolation:</p>
         <ul>
@@ -1670,27 +1749,33 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
 
         <div class="feature">
           <h4>GP Hyperparameters Panel</h4>
-          <p>Click <strong>"GP hyperparameters ▾"</strong> below the GP controls to open the collapsible hyperparameter panel. The visible sliders change with the selected kernel, each slider shows its current value, and GP correction uses the current slider values each time it runs.</p>
+          <p>Click <strong>"GP hyperparameters ▾"</strong> below the GP controls to open the collapsible hyperparameter panel. The visible sliders change with the selected kernel, each slider shows its current value, and every GP-based proposal (timing correction, missing-beat reconstruction) uses the current slider values each time it runs.</p>
         </div>
 
         <h4>Workflow</h4>
         <ol>
-          <li>Configure detection parameters (min/max RR, max change α)</li>
+          <li>Configure detection parameters (min/max RR, max change α) and, if needed, the structural thresholds</li>
           <li>Select a GP kernel and adjust the <strong>GP hyperparameters</strong> sliders if needed</li>
-          <li>Click <strong>"🧪 Detect RR outliers"</strong> to flag implausible intervals</li>
-          <li>Review the flagged count in the display</li>
-          <li>Click <strong>"✨ GP-correct flagged RR"</strong> to estimate corrected values using GP regression</li>
-          <li>Optionally click <strong>"🗑 Remove flagged RR"</strong> to delete the R-peaks associated with flagged intervals</li>
+          <li>Click <strong>"Detect RR outliers"</strong> to flag implausible intervals and generate structural suggestions</li>
+          <li>Click <strong>"Review flagged RR…"</strong>, or click a flagged ring on the plot, to open a case</li>
+          <li>Choose an action (GP timing correction, add/delete/move a peak, or retain as physiological) and inspect the preview overlay</li>
+          <li>Click <strong>"Apply"</strong> to commit the change, or <strong>"Undo last RR correction"</strong> to revert it</li>
+          <li>Repeat until the review summary shows all cases reviewed; click <strong>"RR correction details…"</strong> for a per-case audit table</li>
         </ol>
 
         <div class="warning">
-          <h4>⚠️ GP Correction Requirements</h4>
-          <p>GP correction requires at least 3 accepted (non-flagged) RR intervals to train the model, and at least 1 flagged interval to correct. If correction fails, try adjusting thresholds or using a different kernel.</p>
+          <h4>⚠️ GP Proposal Requirements</h4>
+          <p>A GP-based proposal (timing correction or missing-beat reconstruction) requires at least 2 accepted (non-flagged) RR intervals in the segment to train the model. If a proposal fails, try adjusting the detection or structural thresholds so fewer intervals are excluded from training, or try a different kernel (RQ is usually most robust).</p>
         </div>
 
         <div class="tip">
-          <h4>💡 When to Use GP Correction</h4>
-          <p>Run RR outlier detection and GP correction <strong>before</strong> computing HRV metrics. This removes or corrects ectopic beats, missed beats, and artifacts that would otherwise distort HRV estimates.</p>
+          <h4>💡 When to Review RR Corrections</h4>
+          <p>Detect and review flagged RR intervals <strong>before</strong> computing HRV metrics, and apply (or explicitly retain) each case. This removes or corrects ectopic beats, missed beats, and artifacts that would otherwise distort HRV estimates — and because each decision is explicit, the audit table and exported metadata document exactly why every correction was made.</p>
+        </div>
+
+        <div class="feature">
+          <h4>Review summary & correction details</h4>
+          <p>The RR review box shows a running count — <em>Reviewed / Corrected / Added / Deleted / Retained</em> — for the current channel and segment. Click <strong>"Details…"</strong> (or the <strong>"RR correction details…"</strong> button) to open a table listing every case's raw and corrected RR, peak action, GP kernel and uncertainty, QRS confirmation, HRV inclusion, and status.</p>
         </div>
       </div>
     </section>
@@ -1760,8 +1845,8 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       </div>
 
       <div class="tip">
-        <h4>10. Use GP Correction Before HRV Analysis</h4>
-        <p>Before computing HRV metrics, run RR outlier detection and GP correction to remove or correct ectopic beats and artifacts. This ensures more reliable HRV estimates.</p>
+        <h4>10. Review Flagged RR Before HRV Analysis</h4>
+        <p>Before computing HRV metrics, run RR outlier detection and step through the review panel for each flagged case — applying a correction or explicitly retaining it as physiological. This removes or corrects ectopic beats and artifacts that would otherwise distort HRV estimates, while keeping a record of every decision.</p>
       </div>
 
       <div class="tip">
@@ -1833,8 +1918,8 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       </div>
 
       <div class="feature">
-        <h4>Issue: GP correction fails or returns poor results</h4>
-        <p><strong>Solution:</strong> GP correction requires at least 3 accepted (non-flagged) RR intervals. Try adjusting the detection thresholds to flag fewer intervals, or try a different kernel (RQ is usually most robust).</p>
+        <h4>Issue: A GP-based proposal (timing correction / add missing peak) fails or returns poor results</h4>
+        <p><strong>Solution:</strong> These proposals require at least 2 accepted (non-flagged) RR intervals in the segment to train the model. Try adjusting the detection or structural thresholds so fewer intervals are excluded from training, or try a different kernel (RQ is usually most robust). If the reconstructed intervals fall outside the absolute RR bounds, the proposal is rejected — widen the bounds or choose a different action (e.g. "Retain as physiological") for that case.</p>
       </div>
 
       <div class="feature">
@@ -1886,7 +1971,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
         <li><strong>Privacy:</strong> 100% client-side processing, no server uploads</li>
         <li><strong>Beat Classification:</strong> 19 WFDB annotation codes following PhysioNet standards</li>
         <li><strong>HRV Analysis:</strong> Time-domain (SDNN, RMSSD, pNN50), frequency-domain (ULF, VLF, LF, HF) with Welch's PSD, and nonlinear (Poincaré SD1/SD2/SD2:SD1, sample entropy) metrics</li>
-        <li><strong>RR Correction:</strong> Gaussian Process regression with multiple kernel options (RQ, Matérn, Periodic, Brownian) and adjustable optimized hyperparameters</li>
+        <li><strong>RR Correction:</strong> four-stage review workflow (detect → structural suggestion → preview → apply) with Gaussian Process regression, multiple kernel options (RQ, Matérn, Periodic, Brownian), adjustable optimized hyperparameters, and full undo</li>
         <li><strong>Session Management:</strong> Full-state export and import in JSON, MAT, and NPZ containers for reproducible analysis restoration</li>
       </ul>
       <h3>Acknowledgments</h3>
@@ -1908,7 +1993,10 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
 
   <footer>
     <p><strong>CardioAnnotate</strong> - A Toolkit for ECG Peak Labeling and Processing</p>
-    <p><button class="version-link" onclick="showChangelogModal()">Version 0.1.0</button> | 100% Client-Side Processing | Privacy-Preserving | Open Standards | WFDB Compatible</p>
+    <p><button class="version-link" onclick="showChangelogModal()">Version 0.2.0</button> | 100% Client-Side Processing | Privacy-Preserving | Open Standards | WFDB Compatible</p>
+    <p style="font-size:12px; margin-top:10px;">
+    This software is provided "as is", without warranties of any kind, express or implied.
+  </p>
   </footer>
 
   <!-- Changelog Modal -->
