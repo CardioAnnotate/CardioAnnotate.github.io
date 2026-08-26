@@ -4,6 +4,10 @@
 
 CardioAnnotate is an offline, browser-based ECG annotation tool for multi-fiducial ECG labeling, RR-interval quality control and correction, and heart rate variability analysis. The tool runs locally in the user's web browser and does not require server-side processing or upload of ECG data.
 
+<img width="1200"
+     alt="CardioAnnotate toolkit interface"
+     src="https://github.com/user-attachments/assets/2f64c15a-1c37-41cb-a71d-2ca7dcd7b934" />
+
 ## Online application
 
 The live browser version is available at:
