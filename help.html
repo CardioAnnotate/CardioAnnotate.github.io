@@ -1341,6 +1341,38 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
         <h4>💡 Export Summary</h4>
         <p>After exporting, a status message shows which files were created and the count of each peak type (e.g., "✓ Exported: record.hea, record.dat, record.atr (245 R, 38 P, 41 T)").</p>
       </div>
+
+      <h3>PDF / Print Report</h3>
+      <p>Click <strong>"📄 Report"</strong> in the header to open a report-builder tab. It brings together the record metadata, peak counts, summary statistics, signal quality, HRV metrics, and the ECG, RR-tachogram, PSD, Poincaré, and HRV PSD plots into a single document you can print or save as a PDF.</p>
+
+      <h4>Building the Report</h4>
+      <p>The report tab opens on an options screen:</p>
+      <ul>
+        <li><strong>Report title / Notes</strong> — optional free-text fields shown at the top of the report</li>
+        <li><strong>Channel</strong> — the channel used for the segment-dependent sections and plots</li>
+        <li><strong>Segment</strong> — the full record, or a custom start/end range in seconds</li>
+        <li><strong>ECG plot image</strong> — the current on-screen view, a full-record overview, or both</li>
+        <li><strong>Sections to include</strong> — checkboxes for record metadata, peak counts, summary stats, SQI, HRV metrics, RR-interval tachogram, ECG PSD plot, Poincaré plot, and HRV PSD plot</li>
+      </ul>
+      <p>Click <strong>"Generate report"</strong> to assemble the document with a "Generated" timestamp. Click <strong>"← Back to options"</strong> at any time to change the channel, segment, or included sections and generate again.</p>
+
+      <div class="tip">
+        <h4>💡 The Report Uses Its Own Channel and Segment</h4>
+        <p>The RR-interval tachogram, ECG PSD, Poincaré, and HRV PSD sections are recomputed for the channel and segment chosen on the report page — they do not simply reuse whatever is currently zoomed or selected in the main window. If a section cannot be computed (for example, too few RR intervals in a short custom segment), the report shows a brief explanation in its place instead of the plot.</p>
+      </div>
+
+      <h4>Printing or Saving as PDF</h4>
+      <p>Once the report is generated, click <strong>"🖨️ Print / Save as PDF"</strong>. This opens your browser's normal print dialog; choose "Save as PDF" (or your system's PDF printer) as the destination instead of a physical printer.</p>
+
+      <div class="tip">
+        <h4>💡 Removing the Browser's Print Header/Footer</h4>
+        <p>Most browsers add their own header and footer to printed pages (title, date, page address, page number). Because the report opens in a blank tab, its address shows as <code>about:blank</code> in that footer. In the print dialog, open <strong>"More settings"</strong> and turn off <strong>"Headers and footers"</strong> to remove this strip and print only the report content.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Keep the Main Tab Open</h4>
+        <p>The report tab pulls data from the main CardioAnnotate tab each time you click "Generate report," so keep the main tab open until you are done with the report.</p>
+      </div>
     </section>
 
     <section id="processing">
@@ -1480,6 +1512,8 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
           </tbody>
         </table>
 
+        <p>A <strong>PSD plot</strong> of the visible ECG segment can be opened in a separate window using the <strong>PSD plot</strong> button. The Welch power spectral density of the active channel is shown with the subbands used above shaded on the curve — baseline (0–1 Hz), QRS (5–15 Hz), the pSQI/basSQI window (5–40 Hz), and the mains ± width band — alongside a live pSQI/kSQI/basSQI/lineSQI readout.</p>
+
         <div class="tip">
           <h4>💡 Mains Frequency Settings</h4>
           <p>Adjust the <strong>Mains</strong> dropdown (50 Hz for Europe/Asia or 60 Hz for Americas) and <strong>±</strong> bandwidth (0.5 to 2 Hz) to match your region's power grid for accurate lineSQI calculation.</p>
@@ -1529,6 +1563,8 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
           </tbody>
         </table>
 
+        <p>An <strong>RR interval plot</strong> (tachogram) of the visible segment can be opened in a separate window using the <strong>RR interval plot</strong> button, with the x-axis switchable between time and beat number. A "Show flagged intervals" toggle marks intervals that failed the RR quality-control rules (Section 7.4); flagged or excluded intervals are bridged onto the curve with a dashed line, plotted at their original value, rather than appearing as a break.</p>
+
         <h4>Frequency-Domain Metrics</h4>
         <p>Computed using Welch's method (Hann window, 50% overlap):</p>
         <table class="beat-type-table">
@@ -1567,6 +1603,8 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
             </tr>
           </tbody>
         </table>
+
+        <p>An <strong>HRV PSD plot</strong> of the RR-interval spectrum can be opened in a separate window using the <strong>HRV PSD plot</strong> button; the ULF/VLF/LF/HF bands are shaded on the curve alongside a live band-power readout, with a toggle to switch the frequency axis between linear (default) and log scale.</p>
 
       <h4>Nonlinear Metrics</h4>
         <p>Derived from the Poincaré plot of successive NN intervals (RR<sub>n</sub> versus RR<sub>n+1</sub>) and from the sample entropy of the NN series. A Poincaré plot can be opened in a separate window using the <strong>Poincaré plot</strong> button; the SD1/SD2 dispersion ellipse, centered at the mean NN, is overlaid on the scatter.</p>
@@ -1713,9 +1751,9 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
         </div>
 
         <h4>Plot Legend</h4>
-        <p>Flagged and reviewed RR cases are drawn as coloured rings and interval segments on the ECG plot:</p>
+        <p>Flagged and reviewed RR cases are drawn as colored rings and interval segments on the ECG plot:</p>
         <table class="beat-type-table">
-          <thead><tr><th>Colour</th><th>Meaning</th></tr></thead>
+          <thead><tr><th>color</th><th>Meaning</th></tr></thead>
           <tbody>
             <tr><td>Amber</td><td>flagged — unreviewed</td></tr>
             <tr><td>Blue</td><td>GP timing correction applied</td></tr>
@@ -1958,8 +1996,8 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       <p>If you use CardioAnnotate in your research or clinical work, please cite:</p>
       
       <div class="feature">
-        <h4>CardioAnnotate: A Toolkit for ECG Peak Labeling and Processing</h4>
-        <p>A browser-based ECG annotation toolkit with integrated signal processing, R-peak beat classification, HRV analysis, and WFDB format support.</p>
+        <h4>CardioAnnotate: An Interactive Toolkit for ECG Signal Processing, Annotation, Gaussian Process Correction, and Interoperable Data Exchange</h4>
+        <p>Mojtahed, Hamed, et al. (under review)</p>
         <button class="copy-btn" onclick="showBibtexModal('cardioannotate')" style="margin-top:8px">📋 Copy BibTeX</button>
       </div>
 
@@ -2001,7 +2039,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
 
   <footer>
     <p><strong>CardioAnnotate</strong> - A Toolkit for ECG Peak Labeling and Processing</p>
-    <p><button class="version-link" onclick="showChangelogModal()">Version 0.2.0</button> | 100% Client-Side Processing | Privacy-Preserving | Open Standards | WFDB Compatible</p>
+    <p><button class="version-link" onclick="showChangelogModal()">Version 0.3.0</button> | 100% Client-Side Processing | Privacy-Preserving | Open Standards | WFDB Compatible</p>
     <p style="font-size:12px; margin-top:10px;">
     This software is provided "as is", without warranties of any kind, express or implied.
   </p>

@@ -350,6 +350,7 @@
     <span class="badge">100% client-side · No uploads</span>
     <span id="pyStatus" class="status loading">Initializing...</span>
     <div class="spacer"></div>
+    <button id="btnOpenReport" class="btn" title="Build a printable/PDF report of the current record, stats, and plots">📄 Report</button>
     <button id="themeToggle" class="btn" title="Toggle dark/light mode" style="border-color:#94a3b8">🌙 Dark</button>
     <a href="help.html" target="_blank" class="help-link">📖 Help</a>
   </header>
@@ -360,7 +361,7 @@
     <div class="text">
       <strong>Please cite:</strong>
       <a href="#" onclick="openBibWindow('cardio'); return false;">
-        <em>"CardioAnnotate: A Toolkit for ECG Peak Labeling and Processing"</em>
+        <em>"CardioAnnotate: A Toolkit for ECG Peak Labeling, Processing, and HRV"</em>
       </a>
       and
       <a href="#" onclick="openBibWindow('rrgp'); return false;">
@@ -374,7 +375,9 @@
 <script>
 const bibtexData = {
   cardio: `@article{CardioAnnotate2026,
-  title={CardioAnnotate: A Toolkit for ECG Peak Labeling and Processing},
+  title={CardioAnnotate: An Interactive Toolkit for ECG Signal Processing,
+Annotation, Gaussian Process Correction, and Interoperable Data
+Exchange},
   author={Authors},
   journal={Journal Name},
   year={2026}
@@ -836,6 +839,10 @@ function openBibWindow(key) {
           <div><label>lineSQI (mains ratio)</label><div id="sqiLINESQI">—</div></div>
         </div>
 
+        <div style="margin-top:10px">
+          <button id="btnPSDPlot" class="btn" title="Open the power spectral density of the visible ECG segment, with the SQI subbands marked, in a separate small window.">PSD plot ↗</button>
+        </div>
+
         <hr style="margin:12px 0; border:none; border-top:1px solid var(--border);" />
         <div class="mini-grid">
           <div><label>Duration</label><div id="durVal">—</div></div>
@@ -977,6 +984,8 @@ function openBibWindow(key) {
 
         <div style="margin-top:10px">
           <button id="btnPoincarePlot" class="btn" title="Open the Poincaré scatter (RR_n vs RR_n+1) for the visible segment in a separate small window.">Poincaré plot ↗</button>
+          <button id="btnHRVPSDPlot" class="btn" title="Open the RR-interval power spectrum (ULF/VLF/LF/HF bands marked) for the visible segment in a separate small window. Requires the segment to span more than ~20 s.">HRV PSD plot ↗</button>
+          <button id="btnRRIntervalPlot" class="btn" title="Open the RR-interval tachogram (RR interval vs. time or beat number) for the visible segment in a separate small window.">RR interval plot ↗</button>
         </div>
 
 </div>
@@ -1570,6 +1579,39 @@ def unpack_session(b64_str, fmt):
     }
   }
 
+  // ======== Report data-access API (read-only; called from the report tab via window.opener) ========
+  function reportGetMeta(){
+    return {
+      recordBase: state.recordBase || '',
+      channelNames: (state.channelNames||[]).slice(),
+      units: (state.units||[]).slice(),
+      nSamples: state.nSamples||0,
+      fs: state.fs||0,
+      duration: (state.nSamples && state.fs) ? (state.nSamples/state.fs) : null,
+      currentChannel: currentChannel
+    };
+  }
+
+  // Peak-type counts are global (summed across all channels), matching the
+  // badges in the GUI -- they are not channel-specific.
+  function reportGetPeakCounts(){
+    const types = ['R','P','Q','S','T','U'];
+    const out = {};
+    for(const t of types){
+      let total=0;
+      const typeCounts = {};
+      for(const ch in state.peaks[t]){
+        const arr = state.peaks[t][ch]||[];
+        total += arr.length;
+        if(t==='R'){
+          for(const peak of arr){ const bt=peak.type||'N'; typeCounts[bt]=(typeCounts[bt]||0)+1; }
+        }
+      }
+      out[t] = {total, breakdown: typeCounts};
+    }
+    return out;
+  }
+
   function updateBadges(){
     const types = ['R','P','Q','S','T','U'];
     for(const t of types){
@@ -1696,6 +1738,56 @@ def unpack_session(b64_str, fmt):
     // Update HRV panel (visible segment)
     updateHRVDebounced();
     updateSQIDebounced();
+  }
+
+  // Read-only counterpart of computeStats() for an arbitrary channel, used by
+  // report generation. Whole-channel averages (Duration/Avg RR/HR/PR/QT/QRS),
+  // same math as computeStats() above, but returns values instead of writing
+  // to the live DOM and does not consult the live segment's rrQcLast (which
+  // belongs to whatever channel/segment is currently on screen, not
+  // necessarily the channel the report is being built for).
+  function computeStatsForChannel(ch){
+    const out = {dur:null, avgRR:null, avgHR:null, avgPR:null, avgQT:null, avgQRS:null};
+    if(!state.fs || !state.nSamples) return out;
+    const R_objs = state.peaks.R[ch]||[];
+    const R = R_objs.map(p=>p.index);
+    const P = state.peaks.P[ch]||[];
+    const Q = state.peaks.Q[ch]||[];
+    const S = state.peaks.S[ch]||[];
+    const T = state.peaks.T[ch]||[];
+
+    out.dur = state.nSamples / state.fs;
+
+    if(R.length > 1){
+      const diffs = R.slice(1).map((v,i)=>(v-R[i])/state.fs*1000);
+      out.avgRR = diffs.reduce((a,b)=>a+b,0)/diffs.length;
+      out.avgHR = 60000/out.avgRR;
+    }
+
+    if(P.length && R.length){
+      let prSum=0, prCnt=0;
+      P.forEach(p=>{ const r=R.find(v=>v>p); if(r){ prSum+=(r-p)/state.fs*1000; prCnt++; } });
+      if(prCnt) out.avgPR = prSum/prCnt;
+    }
+
+    if(T.length && (Q.length || R.length)){
+      let qtSum=0, qtCnt=0;
+      const qrsStart = Q.length ? Q : R;
+      qrsStart.forEach(q=>{ const t=T.find(v=>v>q); if(t){ qtSum+=(t-q)/state.fs*1000; qtCnt++; } });
+      if(qtCnt) out.avgQT = qtSum/qtCnt;
+    }
+
+    if(Q.length && S.length){
+      let qrsSum=0, qrsCnt=0;
+      Q.forEach(q=>{ const s=S.find(v=>v>q); if(s){ qrsSum+=(s-q)/state.fs*1000; qrsCnt++; } });
+      if(qrsCnt) out.avgQRS = qrsSum/qrsCnt;
+    } else if(R.length && S.length){
+      let qrsSum=0, qrsCnt=0;
+      R.forEach(r=>{ const s=S.find(v=>v>r && v<r+50); if(s){ qrsSum+=(s-r)/state.fs*1000; qrsCnt++; } });
+      if(qrsCnt) out.avgQRS = qrsSum/qrsCnt;
+    }
+
+    return out;
   }
 
 
@@ -2101,7 +2193,15 @@ def unpack_session(b64_str, fmt):
     }
   }
 
-  function _getVisibleSampleRange(){
+  function _getVisibleSampleRange(s0Override, s1Override){
+    // Additive override: report generation (or any caller) can pass explicit
+    // sample bounds to bypass the live on-screen zoom entirely. Existing call
+    // sites (no arguments) are completely unaffected.
+    if(s0Override != null && s1Override != null && isFinite(s0Override) && isFinite(s1Override)){
+      const lo = Math.max(0, Math.min(state.nSamples-1, Math.floor(Math.min(s0Override, s1Override))));
+      const hi = Math.max(0, Math.min(state.nSamples-1, Math.ceil(Math.max(s0Override, s1Override))));
+      return [lo, hi];
+    }
     // zoomState.xaxis.range is stored in whatever unit is currently selected for the x axis
     // (sample index, seconds, minutes, or hours) - convert back to sample indices here.
     let x0=0, x1=state.nSamples-1;
@@ -2117,17 +2217,26 @@ def unpack_session(b64_str, fmt):
     return [x0,x1];
   }
 
-  function computeHRVForVisibleSegment(){
+  function computeHRVForVisibleSegment(opts){
+    // Additive: opts = {channel, s0, s1, writeUI}. All existing call sites pass
+    // no arguments, so channel/segment default to the live on-screen selection
+    // and writeUI defaults to true -- behavior is unchanged for the main GUI.
+    // Report generation passes an explicit channel/segment with writeUI:false
+    // so it never touches the live HRV panel, RR-QC status, or correction cache.
+    const o = opts || {};
+    const writeUI = (o.writeUI !== false);
     if(!state.fs || !state.nSamples) return null;
-    const ch=currentChannel;
+    const ch = (o.channel != null) ? o.channel : currentChannel;
     const R_objs = state.peaks.R[ch]||[];
     const R = R_objs.map(p=>p.index).filter(v=>Number.isFinite(v)).sort((a,b)=>a-b);
-    const [s0,s1]=_getVisibleSampleRange();
+    const [s0,s1]=_getVisibleSampleRange(o.s0, o.s1);
 
     const t0 = s0/state.fs;
     const t1 = s1/state.fs;
-    _setHrvText('hrvSegStart', _fmtNum(t0,2));
-    _setHrvText('hrvSegEnd', _fmtNum(t1,2));
+    if(writeUI){
+      _setHrvText('hrvSegStart', _fmtNum(t0,2));
+      _setHrvText('hrvSegEnd', _fmtNum(t1,2));
+    }
 
     // R-peaks inside window
     const Rw = R.filter(ix => ix>=s0 && ix<=s1);
@@ -2136,6 +2245,12 @@ def unpack_session(b64_str, fmt):
     }
     // NN intervals (ms) for consecutive peaks within the segment
     const nnRawMs = _rrFromRPeaksInRange(Rw);
+
+    // Per-interval time (seconds, absolute, aligned to the second R-peak of each
+    // pair -- same convention as _rrFromRPeaksInRange). Exposed additively for
+    // the RR interval (tachogram) plot's time-axis mode.
+    const rrTimeSec = [];
+    for(let i=1;i<Rw.length;i++){ rrTimeSec.push(Rw[i]/state.fs); }
 
     // Apply RR QC (if configured). If GP correction was applied, use corrected RR; otherwise compute metrics on accepted (non-NaN) RR.
     const cfg = _readRRQcConfigFromUI();
@@ -2152,19 +2267,20 @@ def unpack_session(b64_str, fmt):
     let nnCleanMs = nnRawMs.slice();
     let usedStoredCorrection = false;
     try{
-      const ctxNow = _rrContext();
+      const ctxNow = _rrContext(o.channel, o.s0, o.s1);
       const stored = _rrValidatedCorrection(ctxNow);
       if(stored){ nnCleanMs = stored.correctedMs.slice(); usedStoredCorrection = true; }
     }catch(_e){ /* fall back to annotation-derived RR */ }
 
-    const prevFlagged = (state.rrQcLast && Array.isArray(state.rrQcLast.flaggedRIdx)) ? state.rrQcLast.flaggedRIdx : [];
-    state.rrQcLast = {maskBad: filt.mask_bad, rrCleanMs: nnCleanMs.slice(), applied: usedStoredCorrection,
-                      reason: filt.reason, rrRawMs: nnRawMs.slice(), flaggedRIdx: prevFlagged};
-
-    const nBad = (state.rrQcLast.maskBad || []).filter(Boolean).length;
-    _setRRQcText('rrFlaggedCount', String(nBad));
-    _setRRQcText('rrCorrectionInfo', (nBad===0) ? 'None flagged'
-      : (usedStoredCorrection ? `GP corrected (${cfg.gpKernel})` : 'Flagged \u2014 awaiting review'));
+    const nBad = (filt.mask_bad || []).filter(Boolean).length;
+    if(writeUI){
+      const prevFlagged = (state.rrQcLast && Array.isArray(state.rrQcLast.flaggedRIdx)) ? state.rrQcLast.flaggedRIdx : [];
+      state.rrQcLast = {maskBad: filt.mask_bad, rrCleanMs: nnCleanMs.slice(), applied: usedStoredCorrection,
+                        reason: filt.reason, rrRawMs: nnRawMs.slice(), flaggedRIdx: prevFlagged};
+      _setRRQcText('rrFlaggedCount', String(nBad));
+      _setRRQcText('rrCorrectionInfo', (nBad===0) ? 'None flagged'
+        : (usedStoredCorrection ? `GP corrected (${cfg.gpKernel})` : 'Flagged \u2014 awaiting review'));
+    }
 
     // Sequence-preserving analysis series: excluded intervals stay in place as NaN
     const nnAnalysisMs = buildRRAnalysisSeries(nnCleanMs, filt.mask_bad);
@@ -2195,6 +2311,7 @@ def unpack_session(b64_str, fmt):
 
     // Frequency-domain (requires enough RR intervals and duration)
     let ulf=null, vlf=null, lf=null, hf=null, lfhf=null;
+    let freqRR=null, psdRR=null; // exposed additively so the HRV PSD plot can reuse this spectrum
     if(nnMs.length >= 4){
       // Build irregular NN time series: assign NN interval at time of the second R-peak (seconds from segment start)
       const rrT=[]; // seconds
@@ -2250,6 +2367,7 @@ def unpack_session(b64_str, fmt):
           freq[k]=k*fsInterp/Nfft;
           psd[k]=P;
         }
+        freqRR=freq; psdRR=psd; // expose for the HRV PSD plot (additive; no effect on band-power calc below)
 
         // Bands (Hz)
         const ULF_B=[0.0, 0.0033];
@@ -2278,6 +2396,8 @@ def unpack_session(b64_str, fmt):
       meanNN, sdnn, rmssd, nn50, pnn50,
       sd1, sd2, sd2sd1, sampen,
       ulf, vlf, lf, hf, lfhf,
+      freqRR, psdRR,
+      rrTimeSec, nnRawMs: nnRawMs.slice(), maskBad: (filt.mask_bad||[]).slice(),
       nR:Rw.length,
       nNN:nnMs.length,
       nnSeries: nnMs.slice(),
@@ -2893,17 +3013,21 @@ if(btnRRRemove){
 }
 
   // ======== Poincaré plot (opens in a separate small window) ========
-  function openPoincarePlot(){
+  // Computes the Poincaré payload/colors for a given channel+segment (or, with
+  // no arguments, the live current channel/on-screen segment -- identical to
+  // the original inline logic). Returns {ok:false, reason} on failure, or
+  // {ok:true, payload, colors}. Pure/read-only when ch is passed explicitly
+  // (writeUI:false is forwarded to computeHRVForVisibleSegment).
+  function _preparePoincare(ch, s0, s1){
+    const explicit = (ch != null);
     let res = null;
-    try{ res = computeHRVForVisibleSegment(); }catch(e){ res = null; }
+    try{ res = computeHRVForVisibleSegment(explicit ? {channel:ch, s0, s1, writeUI:false} : undefined); }catch(e){ res = null; }
     if(!res || !res.ok || !Array.isArray(res.nnSeries)){
-      alert('Poincaré plot unavailable: ' + ((res && res.reason) ? res.reason : 'need R-peaks in the visible segment.'));
-      return;
+      return {ok:false, reason: 'Poincaré plot unavailable: ' + ((res && res.reason) ? res.reason : 'need R-peaks in the visible segment.')};
     }
     const nn = res.nnSeries.filter(v=>isFinite(v) && v>0);
     if(nn.length < 3){
-      alert('Poincaré plot needs at least 3 valid NN intervals in the visible segment.');
-      return;
+      return {ok:false, reason: 'Poincaré plot needs at least 3 valid NN intervals in the visible segment.'};
     }
     // Poincaré pairs must come from ORIGINALLY ADJACENT intervals: excluded
     // intervals break the chain rather than joining their neighbours.
@@ -2915,10 +3039,18 @@ if(btnRRRemove){
     }
 
     const isDark = (document.documentElement.getAttribute('data-theme') === 'dark');
-    const chName = (state.channelNames && state.channelNames[currentChannel] != null)
-      ? String(state.channelNames[currentChannel]) : ('CH ' + currentChannel);
-    const segStart = (document.getElementById('hrvSegStart')||{}).textContent || '—';
-    const segEnd   = (document.getElementById('hrvSegEnd')||{}).textContent || '—';
+    const useCh = explicit ? ch : currentChannel;
+    const chName = (state.channelNames && state.channelNames[useCh] != null)
+      ? String(state.channelNames[useCh]) : ('CH ' + useCh);
+    let segStart, segEnd;
+    if(explicit){
+      const [rs0, rs1] = _getVisibleSampleRange(s0, s1);
+      segStart = _fmtNum(rs0/state.fs, 2);
+      segEnd = _fmtNum(rs1/state.fs, 2);
+    } else {
+      segStart = (document.getElementById('hrvSegStart')||{}).textContent || '—';
+      segEnd   = (document.getElementById('hrvSegEnd')||{}).textContent || '—';
+    }
 
     const payload = {
       xs, ys,
@@ -2931,6 +3063,14 @@ if(btnRRRemove){
       ? { bg:'#0f172a', panel:'#111c33', text:'#e5e7eb', muted:'#9ca3af', border:'#24314a', point:'rgba(96,165,250,0.55)', ident:'#9ca3af', ell:'#f59e0b' }
       : { bg:'#ffffff', panel:'#f9fafb', text:'#111827', muted:'#6b7280', border:'#e5e7eb', point:'rgba(37,99,235,0.45)', ident:'#9ca3af', ell:'#d97706' };
 
+    return {ok:true, payload, colors};
+  }
+
+  // Builds the standalone HTML document (canvas-drawing script included) for
+  // a Poincaré plot from a prepared payload/colors pair. Identical markup and
+  // drawing code to the original inline version -- used by both the live
+  // pop-up window and, via _captureCanvasPNG(), the report generator.
+  function _buildPoincareHTML(payload, colors){
     const html = '<!doctype html><html><head><meta charset="utf-8"/>'
       + '<meta name="viewport" content="width=device-width, initial-scale=1"/>'
       + '<title>Poincaré plot</title>'
@@ -2948,8 +3088,8 @@ if(btnRRRemove){
       + 'canvas{display:block;border:1px solid ' + colors.border + ';border-radius:8px;background:' + colors.panel + ';}'
       + '.note{font-size:10px;color:' + colors.muted + ';margin-top:8px;line-height:1.3;}'
       + '</style></head><body><div class="wrap">'
-      + '<h1>Poincaré plot &nbsp;<span style="font-weight:400;color:' + colors.muted + '">(' + chName + ')</span></h1>'
-      + '<div class="sub">Visible segment ' + segStart + '–' + segEnd + ' s &middot; ' + payload.nPairs + ' RR pairs</div>'
+      + '<h1>Poincaré plot &nbsp;<span style="font-weight:400;color:' + colors.muted + '">(' + payload.chName + ')</span></h1>'
+      + '<div class="sub">Visible segment ' + payload.segStart + '–' + payload.segEnd + ' s &middot; ' + payload.nPairs + ' RR pairs</div>'
       + '<div class="stats">'
       + '<div>SD1 (ms)<b id="sSD1">—</b></div>'
       + '<div>SD2 (ms)<b id="sSD2">—</b></div>'
@@ -3018,7 +3158,13 @@ if(btnRRRemove){
       + 'ctx.save();ctx.translate(14,m.t+ph/2);ctx.rotate(-Math.PI/2);'
       + 'ctx.textBaseline="top";ctx.fillText("RR\\u2099\\u208a\\u2081 (ms)",0,0);ctx.restore();'
       + '})();<\/script></body></html>';
+    return html;
+  }
 
+  function openPoincarePlot(){
+    const prep = _preparePoincare();
+    if(!prep.ok){ alert(prep.reason); return; }
+    const html = _buildPoincareHTML(prep.payload, prep.colors);
     const w = window.open('', 'poincare_' + Date.now(), 'width=520,height=640,menubar=no,toolbar=no,location=no,status=no');
     if(!w){ alert('Could not open a new window. Please allow pop-ups for this page.'); return; }
     w.document.open();
@@ -3031,6 +3177,415 @@ if(btnRRRemove){
     btnPoincare.addEventListener('click', ()=>{
       try{ openPoincarePlot(); }
       catch(e){ console.error('Poincaré plot failed', e); alert('Poincaré plot failed: ' + (e.message||String(e))); }
+    });
+  }
+
+
+  // ======== HRV PSD plot (opens in a separate small window) ========
+  // Reuses the RR-interval spectrum already computed for the ULF/VLF/LF/HF
+  // band powers in the HRV panel above (computeHRVForVisibleSegment). This is
+  // a different PSD from the ECG-signal PSD plot: it is built from the
+  // interpolated NN-interval series (ms vs. s), not the raw ECG samples, and
+  // is only available when the visible segment spans more than ~20 s.
+  // See _preparePoincare() above for the (ch,s0,s1) convention: no arguments
+  // = live current channel/on-screen segment (identical to the original
+  // inline logic); explicit args = pure read-only computation for that
+  // channel/segment (used by the report generator).
+  function _prepareHRVPSD(ch, s0, s1){
+    const explicit = (ch != null);
+    let res = null;
+    try{ res = computeHRVForVisibleSegment(explicit ? {channel:ch, s0, s1, writeUI:false} : undefined); }catch(e){ res = null; }
+    if(!res || !res.ok){
+      return {ok:false, reason: 'HRV PSD plot unavailable: ' + ((res && res.reason) ? res.reason : 'need R-peaks in the visible segment.')};
+    }
+    if(!Array.isArray(res.freqRR) || !Array.isArray(res.psdRR)){
+      return {ok:false, reason: 'HRV PSD plot unavailable: the visible segment needs to span more than ~20 s of accepted RR intervals for spectral resolution.'};
+    }
+
+    // Standard HRV band edges (Hz), matching the ULF/VLF/LF/HF powers above.
+    const xMax = 0.45;
+    const fx=[], fy=[];
+    for(let i=0;i<res.freqRR.length;i++){
+      fx.push(res.freqRR[i]);
+      fy.push(res.psdRR[i]);
+      if(res.freqRR[i] >= xMax) break;
+    }
+    if(fx.length < 2){
+      return {ok:false, reason: 'HRV PSD plot unavailable: not enough frequency resolution in the visible segment.'};
+    }
+
+    const isDark = (document.documentElement.getAttribute('data-theme') === 'dark');
+    const useCh = explicit ? ch : currentChannel;
+    const chName = (state.channelNames && state.channelNames[useCh] != null)
+      ? String(state.channelNames[useCh]) : ('CH ' + useCh);
+    let segStart, segEnd;
+    if(explicit){
+      const [rs0, rs1] = _getVisibleSampleRange(s0, s1);
+      segStart = _fmtNum(rs0/state.fs, 2);
+      segEnd = _fmtNum(rs1/state.fs, 2);
+    } else {
+      segStart = (document.getElementById('hrvSegStart')||{}).textContent || '—';
+      segEnd   = (document.getElementById('hrvSegEnd')||{}).textContent || '—';
+    }
+
+    const payload = {
+      fx, fy, xMax,
+      ulf: res.ulf, vlf: res.vlf, lf: res.lf, hf: res.hf, lfhf: res.lfhf,
+      chName, segStart, segEnd, isDark
+    };
+
+    const colors = isDark
+      ? { bg:'#0f172a', panel:'#111c33', text:'#e5e7eb', muted:'#9ca3af', border:'#24314a',
+          curve:'#60a5fa', grid:'#24314a',
+          ulf2:'rgba(148,163,184,0.28)', vlf2:'rgba(217,119,6,0.28)', lf2:'rgba(14,165,233,0.28)', hf2:'rgba(34,197,94,0.30)' }
+      : { bg:'#ffffff', panel:'#f9fafb', text:'#111827', muted:'#6b7280', border:'#e5e7eb',
+          curve:'#2563eb', grid:'#e5e7eb',
+          ulf2:'rgba(100,116,139,0.20)', vlf2:'rgba(217,119,6,0.20)', lf2:'rgba(2,132,199,0.20)', hf2:'rgba(22,163,74,0.22)' };
+    return {ok:true, payload, colors};
+  }
+
+  function _buildHRVPSDHTML(payload, colors){
+
+    const html = '<!doctype html><html><head><meta charset="utf-8"/>'
+      + '<meta name="viewport" content="width=device-width, initial-scale=1"/>'
+      + '<title>HRV PSD plot</title>'
+      + '<style>'
+      + 'html,body{margin:0;background:' + colors.bg + ';color:' + colors.text + ';'
+      + 'font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}'
+      + '.wrap{padding:12px;}'
+      + 'h1{font-size:14px;font-weight:700;margin:0 0 2px 0;}'
+      + '.sub{font-size:11px;color:' + colors.muted + ';margin-bottom:8px;}'
+      + '.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px 8px;'
+      + 'margin:8px 0 10px 0;padding:8px;background:' + colors.panel + ';'
+      + 'border:1px solid ' + colors.border + ';border-radius:8px;}'
+      + '.stats div{font-size:10.5px;color:' + colors.muted + ';}'
+      + '.stats b{display:block;font-size:12.5px;color:' + colors.text + ';font-weight:700;}'
+      + 'canvas{display:block;border:1px solid ' + colors.border + ';border-radius:8px;background:' + colors.panel + ';}'
+      + '.toggle{display:flex;gap:6px;margin:0 0 8px 0;}'
+      + '.toggle button{font-size:11px;padding:4px 10px;border-radius:8px;cursor:pointer;'
+      + 'border:1px solid ' + colors.border + ';background:' + colors.panel + ';color:' + colors.text + ';}'
+      + '.toggle button.active{background:' + colors.curve + ';color:#fff;border-color:' + colors.curve + ';}'
+      + '.legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:8px;}'
+      + '.legend div{display:flex;align-items:center;gap:5px;font-size:10.5px;color:' + colors.muted + ';}'
+      + '.sw{width:10px;height:10px;border-radius:2px;display:inline-block;flex:none;}'
+      + '.note{font-size:10px;color:' + colors.muted + ';margin-top:8px;line-height:1.3;}'
+      + '</style></head><body><div class="wrap">'
+      + '<h1>HRV PSD plot &nbsp;<span style="font-weight:400;color:' + colors.muted + '">(' + payload.chName + ')</span></h1>'
+      + '<div class="sub">Visible segment ' + payload.segStart + '–' + payload.segEnd + ' s &middot; RR-interval spectrum (4 Hz interpolation)</div>'
+      + '<div class="stats">'
+      + '<div>ULF (ms&sup2;)<b id="sULF">—</b></div>'
+      + '<div>VLF (ms&sup2;)<b id="sVLF">—</b></div>'
+      + '<div>LF (ms&sup2;)<b id="sLF">—</b></div>'
+      + '<div>HF (ms&sup2;)<b id="sHF">—</b></div>'
+      + '<div>LF/HF<b id="sLFHF">—</b></div>'
+      + '</div>'
+      + '<div class="toggle">'
+      + '<button id="btnLin" class="active">Linear</button>'
+      + '<button id="btnLog">Log</button>'
+      + '</div>'
+      + '<canvas id="pc" width="560" height="380"></canvas>'
+      + '<div class="legend">'
+      + '<div><span class="sw" style="background:' + colors.ulf2 + '"></span>ULF (0–0.0033 Hz)</div>'
+      + '<div><span class="sw" style="background:' + colors.vlf2 + '"></span>VLF (0.0033–0.04 Hz)</div>'
+      + '<div><span class="sw" style="background:' + colors.lf2 + '"></span>LF (0.04–0.15 Hz)</div>'
+      + '<div><span class="sw" style="background:' + colors.hf2 + '"></span>HF (0.15–0.40 Hz)</div>'
+      + '</div>'
+      + '<div class="note">Power spectral density (ms&sup2;/Hz, log scale) of the interpolated RR-interval series for the visible segment. '
+      + 'Switch the frequency axis between linear (standard HRV convention) and log (spreads ULF/VLF out for inspection).</div>'
+      + '</div>'
+      + '<script>(function(){'
+      + 'var D=' + JSON.stringify(payload) + ';'
+      + 'var C=' + JSON.stringify(colors) + ';'
+      + 'function fmt(x,d){return (x==null||!isFinite(x))?"\\u2014":Number(x).toFixed(d);}'
+      + 'document.getElementById("sULF").textContent=(D.ulf==null)?"\\u2014":fmt(D.ulf,2);'
+      + 'document.getElementById("sVLF").textContent=(D.vlf==null)?"\\u2014":fmt(D.vlf,2);'
+      + 'document.getElementById("sLF").textContent=fmt(D.lf,2);'
+      + 'document.getElementById("sHF").textContent=fmt(D.hf,2);'
+      + 'document.getElementById("sLFHF").textContent=fmt(D.lfhf,2);'
+      + 'var cv=document.getElementById("pc");'
+      + 'var dpr=window.devicePixelRatio||1;'
+      + 'var cssW=560,cssH=380;'
+      + 'cv.width=Math.round(cssW*dpr);cv.height=Math.round(cssH*dpr);'
+      + 'cv.style.width=cssW+"px";cv.style.height=cssH+"px";'
+      + 'var ctx=cv.getContext("2d");ctx.scale(dpr,dpr);'
+      + 'var W=cssW,H=cssH,m={l:56,r:14,t:14,b:34};'
+      + 'var pw=W-m.l-m.r,ph=H-m.t-m.b;'
+      // ---- y-axis (log) range from the data, floored to keep near-zero bins finite ----
+      + 'var maxV=-Infinity;'
+      + 'for(var i=0;i<D.fy.length;i++){if(isFinite(D.fy[i])&&D.fy[i]>maxV)maxV=D.fy[i];}'
+      + 'if(!isFinite(maxV)||maxV<=0)maxV=1;'
+      + 'var floorV=maxV*1e-5;'
+      + 'var minV=Infinity;'
+      + 'for(var j=0;j<D.fy.length;j++){var v=Math.max(D.fy[j],floorV);if(v<minV)minV=v;}'
+      + 'if(!isFinite(minV)||minV<=0)minV=floorV;'
+      + 'var yLo=Math.floor(Math.log10(minV)),yHi=Math.ceil(Math.log10(maxV));'
+      + 'if(yHi<=yLo)yHi=yLo+1;'
+      + 'function Y(v){var lv=Math.log10(Math.max(v,floorV));return m.t+ph-(lv-yLo)/(yHi-yLo)*ph;}'
+      // x-axis lower bound for log mode: first non-zero bin (frequency resolution), never below 1e-4
+      + 'var xMinLog=1e-4;'
+      + 'for(var q=0;q<D.fx.length;q++){if(D.fx[q]>0){xMinLog=Math.max(1e-4,D.fx[q]);break;}}'
+      + 'function niceStep(range){var raw=range/6;var p=Math.pow(10,Math.floor(Math.log10(raw)));var n=raw/p;var s=(n<1.5)?1:(n<3)?2:(n<7)?5:10;return s*p;}'
+      + 'function draw(mode){'
+      + 'var Xlin=function(f){return m.l+(f/D.xMax)*pw;};'
+      + 'var xLoLog=Math.log10(xMinLog),xHiLog=Math.log10(D.xMax);'
+      + 'var Xlog=function(f){var lf=Math.log10(Math.max(f,xMinLog));return m.l+(lf-xLoLog)/(xHiLog-xLoLog)*pw;};'
+      + 'var X=(mode==="log")?Xlog:Xlin;'
+      + 'ctx.clearRect(0,0,W,H);'
+      + 'function band(f0,f1,color){var x0=X(Math.max(0,f0)),x1=X(Math.min(D.xMax,f1));'
+      + 'if(x1<=x0)return;ctx.fillStyle=color;ctx.fillRect(x0,m.t,x1-x0,ph);}'
+      + 'band(0,0.0033,C.ulf2);'
+      + 'band(0.0033,0.04,C.vlf2);'
+      + 'band(0.04,0.15,C.lf2);'
+      + 'band(0.15,0.40,C.hf2);'
+      // ---- grid + ticks ----
+      + 'ctx.strokeStyle=C.grid;ctx.fillStyle=C.muted;ctx.lineWidth=1;ctx.font="10px sans-serif";'
+      + 'ctx.textAlign="center";ctx.textBaseline="top";'
+      + 'if(mode==="log"){'
+      + 'var loT=Math.floor(xLoLog),hiT=Math.ceil(xHiLog);'
+      + 'for(var xt=loT;xt<=hiT;xt++){var fval=Math.pow(10,xt);if(fval<xMinLog||fval>D.xMax)continue;var xx=X(fval);'
+      + 'ctx.globalAlpha=0.6;ctx.beginPath();ctx.moveTo(xx,m.t);ctx.lineTo(xx,m.t+ph);ctx.stroke();ctx.globalAlpha=1;ctx.fillText("1e"+xt,xx,m.t+ph+6);}'
+      + '}else{'
+      + 'var xStep=niceStep(D.xMax);'
+      + 'for(var xt2=0;xt2<=D.xMax;xt2+=xStep){var xx2=X(xt2);'
+      + 'ctx.globalAlpha=0.6;ctx.beginPath();ctx.moveTo(xx2,m.t);ctx.lineTo(xx2,m.t+ph);ctx.stroke();ctx.globalAlpha=1;ctx.fillText(String(Math.round(xt2*1000)/1000),xx2,m.t+ph+6);}'
+      + '}'
+      + 'ctx.textAlign="right";ctx.textBaseline="middle";'
+      + 'for(var yt=yLo;yt<=yHi;yt++){var yy=Y(Math.pow(10,yt));ctx.globalAlpha=0.6;ctx.beginPath();ctx.moveTo(m.l,yy);ctx.lineTo(m.l+pw,yy);ctx.stroke();ctx.globalAlpha=1;ctx.fillText("1e"+yt,m.l-6,yy);}'
+      // ---- PSD curve ----
+      + 'ctx.strokeStyle=C.curve;ctx.lineWidth=1.5;ctx.beginPath();'
+      + 'var started=false;'
+      + 'for(var k=0;k<D.fx.length;k++){if(mode==="log"&&D.fx[k]<xMinLog)continue;var px=X(D.fx[k]),py=Y(D.fy[k]);'
+      + 'if(!started){ctx.moveTo(px,py);started=true;}else{ctx.lineTo(px,py);}}'
+      + 'ctx.stroke();'
+      // ---- frame + axis titles ----
+      + 'ctx.strokeStyle=C.border;ctx.lineWidth=1;ctx.strokeRect(m.l,m.t,pw,ph);'
+      + 'ctx.fillStyle=C.text;ctx.font="11px sans-serif";'
+      + 'ctx.textAlign="center";ctx.textBaseline="bottom";'
+      + 'ctx.fillText("Frequency (Hz)",m.l+pw/2,H-2);'
+      + 'ctx.save();ctx.translate(14,m.t+ph/2);ctx.rotate(-Math.PI/2);'
+      + 'ctx.textBaseline="top";ctx.fillText("PSD (log scale)",0,0);ctx.restore();'
+      + '}'
+      + 'var btnLin=document.getElementById("btnLin"),btnLog=document.getElementById("btnLog");'
+      + 'function setMode(mode){'
+      + 'btnLin.classList.toggle("active",mode==="linear");'
+      + 'btnLog.classList.toggle("active",mode==="log");'
+      + 'draw(mode);'
+      + '}'
+      + 'btnLin.addEventListener("click",function(){setMode("linear");});'
+      + 'btnLog.addEventListener("click",function(){setMode("log");});'
+      + 'setMode("linear");'
+      + '})();<\/script></body></html>';
+    return html;
+  }
+
+  function openHRVPSDPlot(){
+    const prep = _prepareHRVPSD();
+    if(!prep.ok){ alert(prep.reason); return; }
+    const html = _buildHRVPSDHTML(prep.payload, prep.colors);
+    const w = window.open('', 'hrvpsd_' + Date.now(), 'width=600,height=700,menubar=no,toolbar=no,location=no,status=no');
+    if(!w){ alert('Could not open a new window. Please allow pop-ups for this page.'); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
+
+  const btnHRVPSD = document.getElementById('btnHRVPSDPlot');
+  if(btnHRVPSD){
+    btnHRVPSD.addEventListener('click', ()=>{
+      try{ openHRVPSDPlot(); }
+      catch(e){ console.error('HRV PSD plot failed', e); alert('HRV PSD plot failed: ' + (e.message||String(e))); }
+    });
+  }
+
+
+  // ======== RR interval plot / tachogram (opens in a separate small window) ========
+  // Reuses the same per-segment RR series already computed in
+  // computeHRVForVisibleSegment: nnAnalysisSeries (position-preserving, NaN at
+  // excluded intervals -- what the HRV stats actually use, and what drives the
+  // connecting line here) plus the additive nnRawMs/maskBad/rrTimeSec fields
+  // (uncorrected value and QC flag per interval, and its absolute time) so
+  // flagged/excluded intervals can be marked without recomputing anything.
+  function _prepareRRInterval(ch, s0, s1){
+    const explicit = (ch != null);
+    let res = null;
+    try{ res = computeHRVForVisibleSegment(explicit ? {channel:ch, s0, s1, writeUI:false} : undefined); }catch(e){ res = null; }
+    if(!res || !res.ok || !Array.isArray(res.nnAnalysisSeries)){
+      return {ok:false, reason: 'RR interval plot unavailable: ' + ((res && res.reason) ? res.reason : 'need R-peaks in the visible segment.')};
+    }
+    const yPlot = res.nnAnalysisSeries;
+    const yRaw  = Array.isArray(res.nnRawMs) ? res.nnRawMs : yPlot;
+    const flagged = Array.isArray(res.maskBad) ? res.maskBad : yPlot.map(()=>false);
+    const tSec = Array.isArray(res.rrTimeSec) ? res.rrTimeSec : yPlot.map((_,i)=>i);
+    const n = yPlot.length;
+    if(n < 2){
+      return {ok:false, reason: 'RR interval plot unavailable: need at least 2 RR intervals in the visible segment.'};
+    }
+
+    const isDark = (document.documentElement.getAttribute('data-theme') === 'dark');
+    const useCh = explicit ? ch : currentChannel;
+    const chName = (state.channelNames && state.channelNames[useCh] != null)
+      ? String(state.channelNames[useCh]) : ('CH ' + useCh);
+    let segStart, segEnd;
+    if(explicit){
+      const [rs0, rs1] = _getVisibleSampleRange(s0, s1);
+      segStart = _fmtNum(rs0/state.fs, 2);
+      segEnd = _fmtNum(rs1/state.fs, 2);
+    } else {
+      segStart = (document.getElementById('hrvSegStart')||{}).textContent || '—';
+      segEnd   = (document.getElementById('hrvSegEnd')||{}).textContent || '—';
+    }
+    const nFlagged = flagged.filter(Boolean).length;
+
+    const payload = { n, tSec, yPlot, yRaw, flagged, chName, segStart, segEnd, nFlagged, isDark };
+
+    const colors = isDark
+      ? { bg:'#0f172a', panel:'#111c33', text:'#e5e7eb', muted:'#9ca3af', border:'#24314a',
+          curve:'#60a5fa', grid:'#24314a', point:'#60a5fa',
+          flagIncl:'#f59e0b', flagExcl:'#ef4444' }
+      : { bg:'#ffffff', panel:'#f9fafb', text:'#111827', muted:'#6b7280', border:'#e5e7eb',
+          curve:'#2563eb', grid:'#e5e7eb', point:'#2563eb',
+          flagIncl:'#d97706', flagExcl:'#dc2626' };
+    return {ok:true, payload, colors};
+  }
+
+  function _buildRRIntervalHTML(payload, colors){
+    const html = '<!doctype html><html><head><meta charset="utf-8"/>'
+      + '<meta name="viewport" content="width=device-width, initial-scale=1"/>'
+      + '<title>RR interval plot</title>'
+      + '<style>'
+      + 'html,body{margin:0;background:' + colors.bg + ';color:' + colors.text + ';'
+      + 'font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}'
+      + '.wrap{padding:12px;}'
+      + 'h1{font-size:14px;font-weight:700;margin:0 0 2px 0;}'
+      + '.sub{font-size:11px;color:' + colors.muted + ';margin-bottom:8px;}'
+      + 'canvas{display:block;border:1px solid ' + colors.border + ';border-radius:8px;background:' + colors.panel + ';}'
+      + '.controls{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:0 0 8px 0;}'
+      + '.toggle{display:flex;gap:6px;}'
+      + '.toggle button{font-size:11px;padding:4px 10px;border-radius:8px;cursor:pointer;'
+      + 'border:1px solid ' + colors.border + ';background:' + colors.panel + ';color:' + colors.text + ';}'
+      + '.toggle button.active{background:' + colors.curve + ';color:#fff;border-color:' + colors.curve + ';}'
+      + '.chkrow{display:flex;align-items:center;gap:6px;font-size:11.5px;color:' + colors.text + ';}'
+      + '.legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:8px;}'
+      + '.legend div{display:flex;align-items:center;gap:5px;font-size:10.5px;color:' + colors.muted + ';}'
+      + '.sw{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none;box-sizing:border-box;}'
+      + '.note{font-size:10px;color:' + colors.muted + ';margin-top:8px;line-height:1.3;}'
+      + '</style></head><body><div class="wrap">'
+      + '<h1>RR interval plot &nbsp;<span style="font-weight:400;color:' + colors.muted + '">(' + payload.chName + ')</span></h1>'
+      + '<div class="sub">Visible segment ' + payload.segStart + '–' + payload.segEnd + ' s &middot; ' + payload.n + ' intervals &middot; ' + payload.nFlagged + ' flagged</div>'
+      + '<div class="controls">'
+      + '<div class="toggle"><button id="btnXTime" class="active">Time</button><button id="btnXBeat">Beat #</button></div>'
+      + '<label class="chkrow"><input type="checkbox" id="chkFlag" checked/> Show flagged intervals</label>'
+      + '</div>'
+      + '<canvas id="pc" width="560" height="360"></canvas>'
+      + '<div class="legend">'
+      + '<div><span class="sw" style="background:' + colors.point + ';border:1px solid ' + colors.point + '"></span>RR interval</div>'
+      + '<div><span class="sw" style="background:none;border:2px solid ' + colors.flagIncl + '"></span>Flagged (kept/corrected)</div>'
+      + '<div><span class="sw" style="background:none;border:2px solid ' + colors.flagExcl + '"></span>Flagged (excluded, raw value shown)</div>'
+      + '</div>'
+      + '<div class="note">RR interval (ms) per beat for the visible segment. Solid line = intervals used in HRV analysis. Dashed line = bridges a flagged/excluded interval, plotted at its actual (uncorrected) value. '
+      + 'A gap with no dashed bridge means the interval was excluded without tripping the QC rules (e.g. reviewed and marked not physiological), or "Show flagged intervals" is off. '
+      + '"Flagged" marks intervals that failed the RR QC bounds/rate-of-change rules above, whether or not they were later corrected or excluded.</div>'
+      + '</div>'
+      + '<script>(function(){'
+      + 'var D=' + JSON.stringify(payload) + ';'
+      + 'var C=' + JSON.stringify(colors) + ';'
+      + 'var cv=document.getElementById("pc");'
+      + 'var dpr=window.devicePixelRatio||1;'
+      + 'var cssW=560,cssH=360;'
+      + 'cv.width=Math.round(cssW*dpr);cv.height=Math.round(cssH*dpr);'
+      + 'cv.style.width=cssW+"px";cv.style.height=cssH+"px";'
+      + 'var ctx=cv.getContext("2d");ctx.scale(dpr,dpr);'
+      + 'var W=cssW,H=cssH,m={l:56,r:14,t:14,b:34};'
+      + 'var pw=W-m.l-m.r,ph=H-m.t-m.b;'
+      // ---- y-axis (linear) range from the raw values, so it stays stable across toggles ----
+      + 'var yMin=Infinity,yMax=-Infinity;'
+      + 'for(var i=0;i<D.n;i++){var v=D.yRaw[i];if(isFinite(v)){if(v<yMin)yMin=v;if(v>yMax)yMax=v;}}'
+      + 'if(!isFinite(yMin)||!isFinite(yMax)){yMin=0;yMax=1000;}'
+      + 'if(yMax<=yMin){yMax=yMin+10;}'
+      + 'var yPad=(yMax-yMin)*0.08||10;var yLo=Math.max(0,yMin-yPad),yHi=yMax+yPad;'
+      + 'function Y(v){return m.t+ph-(v-yLo)/(yHi-yLo)*ph;}'
+      + 'function niceStep(range){var raw=range/6;var p=Math.pow(10,Math.floor(Math.log10(raw)));var n=raw/p;var s=(n<1.5)?1:(n<3)?2:(n<7)?5:10;return s*p;}'
+      + 'function draw(xMode,showFlag){'
+      + 'var xVals=(xMode==="beat")?D.tSec.map(function(_,i){return i+1;}):D.tSec;'
+      + 'var xLo=xVals[0],xHi=xVals[xVals.length-1];if(xHi<=xLo)xHi=xLo+1;'
+      + 'function X(v){return m.l+(v-xLo)/(xHi-xLo)*pw;}'
+      + 'ctx.clearRect(0,0,W,H);'
+      // grid + ticks
+      + 'ctx.strokeStyle=C.grid;ctx.fillStyle=C.muted;ctx.lineWidth=1;ctx.font="10px sans-serif";'
+      + 'ctx.textAlign="center";ctx.textBaseline="top";'
+      + 'var xStep=(xMode==="beat")?Math.max(1,Math.round(niceStep(xHi-xLo))):niceStep(xHi-xLo);'
+      + 'var xt0=(xMode==="beat")?Math.ceil(xLo/xStep)*xStep:xLo;'
+      + 'for(var xt=xt0;xt<=xHi;xt+=xStep){var xx=X(xt);ctx.globalAlpha=0.6;ctx.beginPath();ctx.moveTo(xx,m.t);ctx.lineTo(xx,m.t+ph);ctx.stroke();ctx.globalAlpha=1;'
+      + 'var lbl=(xMode==="beat")?String(Math.round(xt)):String(Math.round(xt*100)/100);ctx.fillText(lbl,xx,m.t+ph+6);}'
+      + 'ctx.textAlign="right";ctx.textBaseline="middle";'
+      + 'var yStep=niceStep(yHi-yLo);var yt0=Math.ceil(yLo/yStep)*yStep;'
+      + 'for(var yt=yt0;yt<=yHi;yt+=yStep){var yy=Y(yt);ctx.globalAlpha=0.6;ctx.beginPath();ctx.moveTo(m.l,yy);ctx.lineTo(m.l+pw,yy);ctx.stroke();ctx.globalAlpha=1;ctx.fillText(String(Math.round(yt)),m.l-6,yy);}'
+      // connecting line: solid where an interval is included, dashed where it
+      // bridges through a flagged/excluded interval (shown at its raw value)
+      // so flagged points sit on the line instead of floating disconnected.
+      // A true gap (no flag, or the flag toggle is off) still breaks the line.
+      + 'var pts=new Array(D.n);'
+      + 'for(var k=0;k<D.n;k++){var v=D.yPlot[k];'
+      + 'if(v!=null&&isFinite(v)){pts[k]={y:v,dashed:false};}'
+      + 'else if(showFlag&&D.flagged[k]&&isFinite(D.yRaw[k])){pts[k]={y:D.yRaw[k],dashed:true};}'
+      + 'else{pts[k]=null;}}'
+      + 'var prevIdx=-1;'
+      + 'for(var k2=0;k2<D.n;k2++){'
+      + 'if(pts[k2]==null){prevIdx=-1;continue;}'
+      + 'if(prevIdx>=0){'
+      + 'var dash=pts[prevIdx].dashed||pts[k2].dashed;'
+      + 'ctx.strokeStyle=C.curve;ctx.lineWidth=1.5;ctx.setLineDash(dash?[4,3]:[]);'
+      + 'ctx.beginPath();ctx.moveTo(X(xVals[prevIdx]),Y(pts[prevIdx].y));ctx.lineTo(X(xVals[k2]),Y(pts[k2].y));ctx.stroke();'
+      + 'ctx.setLineDash([]);'
+      + '}'
+      + 'prevIdx=k2;'
+      + '}'
+      // point markers
+      + 'for(var j=0;j<D.n;j++){'
+      + 'var pj=pts[j];if(pj==null)continue;'
+      + 'var px2=X(xVals[j]),py2=Y(pj.y);'
+      + 'if(!pj.dashed){'
+      + 'ctx.fillStyle=C.point;ctx.beginPath();ctx.arc(px2,py2,2.4,0,2*Math.PI);ctx.fill();'
+      + 'if(showFlag&&D.flagged[j]){ctx.strokeStyle=C.flagIncl;ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(px2,py2,5.5,0,2*Math.PI);ctx.stroke();}'
+      + '}else{'
+      + 'ctx.strokeStyle=C.flagExcl;ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(px2,py2,5.5,0,2*Math.PI);ctx.stroke();'
+      + '}'
+      + '}'
+      // frame + axis titles
+      + 'ctx.strokeStyle=C.border;ctx.lineWidth=1;ctx.strokeRect(m.l,m.t,pw,ph);'
+      + 'ctx.fillStyle=C.text;ctx.font="11px sans-serif";'
+      + 'ctx.textAlign="center";ctx.textBaseline="bottom";'
+      + 'ctx.fillText((xMode==="beat")?"Beat number":"Time (s)",m.l+pw/2,H-2);'
+      + 'ctx.save();ctx.translate(14,m.t+ph/2);ctx.rotate(-Math.PI/2);'
+      + 'ctx.textBaseline="top";ctx.fillText("RR interval (ms)",0,0);ctx.restore();'
+      + '}'
+      + 'var btnXTime=document.getElementById("btnXTime"),btnXBeat=document.getElementById("btnXBeat"),chkFlag=document.getElementById("chkFlag");'
+      + 'var xMode="time";'
+      + 'function redraw(){draw(xMode,chkFlag.checked);}'
+      + 'btnXTime.addEventListener("click",function(){xMode="time";btnXTime.classList.add("active");btnXBeat.classList.remove("active");redraw();});'
+      + 'btnXBeat.addEventListener("click",function(){xMode="beat";btnXBeat.classList.add("active");btnXTime.classList.remove("active");redraw();});'
+      + 'chkFlag.addEventListener("change",redraw);'
+      + 'redraw();'
+      + '})();<\/script></body></html>';
+    return html;
+  }
+
+  function openRRIntervalPlot(){
+    const prep = _prepareRRInterval();
+    if(!prep.ok){ alert(prep.reason); return; }
+    const html = _buildRRIntervalHTML(prep.payload, prep.colors);
+    const w = window.open('', 'rrint_' + Date.now(), 'width=600,height=650,menubar=no,toolbar=no,location=no,status=no');
+    if(!w){ alert('Could not open a new window. Please allow pop-ups for this page.'); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
+
+  const btnRRInterval = document.getElementById('btnRRIntervalPlot');
+  if(btnRRInterval){
+    btnRRInterval.addEventListener('click', ()=>{
+      try{ openRRIntervalPlot(); }
+      catch(e){ console.error('RR interval plot failed', e); alert('RR interval plot failed: ' + (e.message||String(e))); }
     });
   }
 
@@ -3110,13 +3665,16 @@ if(btnRRRemove){
     return {freq, psd};
   }
 
-  function computeSQIForVisibleSegment(){
+  function computeSQIForVisibleSegment(opts){
+    // Additive: opts = {channel, s0, s1}. No-argument calls (all existing call
+    // sites) keep using the live channel/on-screen segment, unchanged.
+    const o = opts || {};
     if(!state.fs || !state.nSamples) return null;
-    const ch=currentChannel;
+    const ch = (o.channel != null) ? o.channel : currentChannel;
     const sig = state.signals[ch];
     if(!sig || sig.length<8) return null;
 
-    const [s0,s1]=_getVisibleSampleRange();
+    const [s0,s1]=_getVisibleSampleRange(o.s0, o.s1);
     const n = Math.max(0, s1 - s0 + 1);
     if(n < 8) return {ok:false, reason:'Segment too short.'};
 
@@ -3159,7 +3717,10 @@ if(btnRRRemove){
       line = (lDen>0) ? (lNum/lDen) : NaN;
     }
 
-    return {ok:true, p, k, bas, line};
+    // freq/psd/nyq/mains/width are exposed (additively) so the PSD plot window
+    // can render the same curve and subbands used for these SQI ratios above,
+    // without recomputing the Welch PSD a second time.
+    return {ok:true, p, k, bas, line, freq, psd, nyq, mains, width};
   }
 
   function updateSQIPanel(){
@@ -3174,7 +3735,7 @@ if(btnRRRemove){
     _setSqiText('sqiPSQI', _fmtNum(res.p,3));
     _setSqiText('sqiKSQI', _fmtNum(res.k,2));
     _setSqiText('sqiBASSQI', _fmtNum(res.bas,3));
-    _setSqiText('sqiLINESQI', _fmtNum(res.line,4));
+    _setSqiText('sqiLINESQI', _fmtNum(res.line,6));
   }
 
   let _sqiDebounceTimer=null;
@@ -3190,6 +3751,193 @@ if(btnRRRemove){
   const lineWidthEl = document.getElementById('lineWidthHz');
   if(mainsHzEl) mainsHzEl.addEventListener('change', ()=>updateSQIDebounced());
   if(lineWidthEl) lineWidthEl.addEventListener('change', ()=>updateSQIDebounced());
+
+
+  // ======== PSD plot (opens in a separate small window) ========
+  // Reuses the same Welch PSD already computed for the SQI ratios (pSQI,
+  // basSQI, lineSQI) above, and marks the corresponding subbands on the curve:
+  //   baseline  : 0 Hz  – 1 Hz   (basSQI numerator)
+  //   QRS band  : 5 Hz  – 15 Hz  (pSQI numerator)
+  //   pSQI/basSQI window: 5 Hz – 40 Hz (denominator for both ratios)
+  //   mains     : mains ± width  (lineSQI numerator)
+  function _preparePSD(ch, s0, s1){
+    const explicit = (ch != null);
+    let res = null;
+    try{ res = computeSQIForVisibleSegment(explicit ? {channel:ch, s0, s1} : undefined); }catch(e){ res = null; }
+    if(!res){
+      return {ok:false, reason: 'PSD plot unavailable: load a signal and select a channel first.'};
+    }
+    if(!res.ok || !Array.isArray(res.freq) || !Array.isArray(res.psd)){
+      return {ok:false, reason: 'PSD plot unavailable: ' + (res.reason || 'need a valid visible ECG segment.')};
+    }
+
+    // Trim the curve to a display range that comfortably covers the baseline,
+    // pSQI/basSQI window, and mains bands (whichever is furthest out).
+    const nyq = res.nyq;
+    const mains = res.mains, width = res.width;
+    const mainsHi = (isFinite(mains) && isFinite(width)) ? (mains+width) : 0;
+    let xMax = Math.min(nyq, Math.max(45, mainsHi + 5));
+    if(!isFinite(xMax) || xMax <= 0) xMax = nyq;
+
+    const fx=[], fy=[];
+    for(let i=0;i<res.freq.length;i++){
+      fx.push(res.freq[i]);
+      fy.push(res.psd[i]);
+      if(res.freq[i] >= xMax) break; // freq is monotonically increasing
+    }
+    if(fx.length < 2){
+      return {ok:false, reason: 'PSD plot unavailable: not enough frequency resolution in the visible segment.'};
+    }
+
+    const isDark = (document.documentElement.getAttribute('data-theme') === 'dark');
+    const useCh = explicit ? ch : currentChannel;
+    const chName = (state.channelNames && state.channelNames[useCh] != null)
+      ? String(state.channelNames[useCh]) : ('CH ' + useCh);
+    let segStart, segEnd;
+    if(explicit){
+      const [rs0, rs1] = _getVisibleSampleRange(s0, s1);
+      segStart = _fmtNum(rs0/state.fs, 2);
+      segEnd = _fmtNum(rs1/state.fs, 2);
+    } else {
+      segStart = (document.getElementById('hrvSegStart')||{}).textContent || '—';
+      segEnd   = (document.getElementById('hrvSegEnd')||{}).textContent || '—';
+    }
+    const units = (state.units && state.units[useCh]) ? String(state.units[useCh]) : 'mV';
+
+    const payload = {
+      fx, fy, xMax,
+      p: res.p, k: res.k, bas: res.bas, line: res.line,
+      mains, width,
+      chName, segStart, segEnd, units, isDark
+    };
+
+    const colors = isDark
+      ? { bg:'#0f172a', panel:'#111c33', text:'#e5e7eb', muted:'#9ca3af', border:'#24314a',
+          curve:'#60a5fa', grid:'#24314a',
+          baseline:'rgba(217,119,6,0.30)', qrs:'rgba(34,197,94,0.32)', denom:'rgba(148,163,184,0.20)', mains2:'rgba(239,68,68,0.30)' }
+      : { bg:'#ffffff', panel:'#f9fafb', text:'#111827', muted:'#6b7280', border:'#e5e7eb',
+          curve:'#2563eb', grid:'#e5e7eb',
+          baseline:'rgba(217,119,6,0.22)', qrs:'rgba(22,163,74,0.24)', denom:'rgba(107,114,128,0.16)', mains2:'rgba(220,38,38,0.22)' };
+    return {ok:true, payload, colors};
+  }
+
+  function _buildPSDHTML(payload, colors){
+    const html = '<!doctype html><html><head><meta charset="utf-8"/>'
+      + '<meta name="viewport" content="width=device-width, initial-scale=1"/>'
+      + '<title>PSD plot</title>'
+      + '<style>'
+      + 'html,body{margin:0;background:' + colors.bg + ';color:' + colors.text + ';'
+      + 'font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}'
+      + '.wrap{padding:12px;}'
+      + 'h1{font-size:14px;font-weight:700;margin:0 0 2px 0;}'
+      + '.sub{font-size:11px;color:' + colors.muted + ';margin-bottom:8px;}'
+      + '.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 10px;'
+      + 'margin:8px 0 10px 0;padding:8px;background:' + colors.panel + ';'
+      + 'border:1px solid ' + colors.border + ';border-radius:8px;}'
+      + '.stats div{font-size:11px;color:' + colors.muted + ';}'
+      + '.stats b{display:block;font-size:13px;color:' + colors.text + ';font-weight:700;}'
+      + 'canvas{display:block;border:1px solid ' + colors.border + ';border-radius:8px;background:' + colors.panel + ';}'
+      + '.legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:8px;}'
+      + '.legend div{display:flex;align-items:center;gap:5px;font-size:10.5px;color:' + colors.muted + ';}'
+      + '.sw{width:10px;height:10px;border-radius:2px;display:inline-block;flex:none;}'
+      + '.note{font-size:10px;color:' + colors.muted + ';margin-top:8px;line-height:1.3;}'
+      + '</style></head><body><div class="wrap">'
+      + '<h1>PSD plot &nbsp;<span style="font-weight:400;color:' + colors.muted + '">(' + payload.chName + ')</span></h1>'
+      + '<div class="sub">Visible segment ' + payload.segStart + '–' + payload.segEnd + ' s &middot; Welch PSD, one-sided</div>'
+      + '<div class="stats">'
+      + '<div>pSQI (5–15/5–40)<b id="sP">—</b></div>'
+      + '<div>kSQI (kurtosis)<b id="sK">—</b></div>'
+      + '<div>basSQI (1−0–1/0–40)<b id="sBas">—</b></div>'
+      + '<div>lineSQI (mains ratio)<b id="sLine">—</b></div>'
+      + '</div>'
+      + '<canvas id="pc" width="560" height="380"></canvas>'
+      + '<div class="legend">'
+      + '<div><span class="sw" style="background:' + colors.baseline + '"></span>Baseline (0–1 Hz)</div>'
+      + '<div><span class="sw" style="background:' + colors.denom + '"></span>pSQI/basSQI window (5–40 Hz)</div>'
+      + '<div><span class="sw" style="background:' + colors.qrs + '"></span>QRS band (5–15 Hz)</div>'
+      + '<div><span class="sw" style="background:' + colors.mains2 + '"></span>Mains band</div>'
+      + '</div>'
+      + '<div class="note">Power spectral density (' + payload.units + '&sup2;/Hz, log scale) of the visible ECG segment for the active channel. '
+      + 'Shaded regions mark the subbands used for the signal-quality ratios above: pSQI is relative power in the QRS band vs. the wider window; '
+      + 'basSQI penalises baseline-band power; lineSQI is relative power in the mains band.</div>'
+      + '</div>'
+      + '<script>(function(){'
+      + 'var D=' + JSON.stringify(payload) + ';'
+      + 'var C=' + JSON.stringify(colors) + ';'
+      + 'function fmt(x,d){return (x==null||!isFinite(x))?"\\u2014":Number(x).toFixed(d);}'
+      + 'document.getElementById("sP").textContent=fmt(D.p,3);'
+      + 'document.getElementById("sK").textContent=fmt(D.k,2);'
+      + 'document.getElementById("sBas").textContent=fmt(D.bas,3);'
+      + 'document.getElementById("sLine").textContent=fmt(D.line,6);'
+      + 'var cv=document.getElementById("pc");'
+      + 'var dpr=window.devicePixelRatio||1;'
+      + 'var cssW=560,cssH=380;'
+      + 'cv.width=Math.round(cssW*dpr);cv.height=Math.round(cssH*dpr);'
+      + 'cv.style.width=cssW+"px";cv.style.height=cssH+"px";'
+      + 'var ctx=cv.getContext("2d");ctx.scale(dpr,dpr);'
+      + 'var W=cssW,H=cssH,m={l:56,r:14,t:14,b:34};'
+      + 'var pw=W-m.l-m.r,ph=H-m.t-m.b;'
+      // ---- y-axis (log) range from the data, floored to keep near-zero bins finite ----
+      + 'var maxV=-Infinity;'
+      + 'for(var i=0;i<D.fy.length;i++){if(isFinite(D.fy[i])&&D.fy[i]>maxV)maxV=D.fy[i];}'
+      + 'if(!isFinite(maxV)||maxV<=0)maxV=1;'
+      + 'var floorV=maxV*1e-5;'
+      + 'var minV=Infinity;'
+      + 'for(var j=0;j<D.fy.length;j++){var v=Math.max(D.fy[j],floorV);if(v<minV)minV=v;}'
+      + 'if(!isFinite(minV)||minV<=0)minV=floorV;'
+      + 'var yLo=Math.floor(Math.log10(minV)),yHi=Math.ceil(Math.log10(maxV));'
+      + 'if(yHi<=yLo)yHi=yLo+1;'
+      + 'function X(f){return m.l+(f/D.xMax)*pw;}'
+      + 'function Y(v){var lv=Math.log10(Math.max(v,floorV));return m.t+ph-(lv-yLo)/(yHi-yLo)*ph;}'
+      + 'ctx.clearRect(0,0,W,H);'
+      // ---- shaded subbands (drawn first, curve drawn on top) ----
+      + 'function band(f0,f1,color){var x0=X(Math.max(0,f0)),x1=X(Math.min(D.xMax,f1));'
+      + 'if(x1<=x0)return;ctx.fillStyle=color;ctx.fillRect(x0,m.t,x1-x0,ph);}'
+      + 'band(5,40,C.denom);'
+      + 'band(5,15,C.qrs);'
+      + 'band(0,1,C.baseline);'
+      + 'if(isFinite(D.mains)&&isFinite(D.width)){band(D.mains-D.width,D.mains+D.width,C.mains2);}'
+      // ---- grid + ticks ----
+      + 'function niceStep(range){var raw=range/6;var p=Math.pow(10,Math.floor(Math.log10(raw)));var n=raw/p;var s=(n<1.5)?1:(n<3)?2:(n<7)?5:10;return s*p;}'
+      + 'var xStep=niceStep(D.xMax);'
+      + 'ctx.strokeStyle=C.grid;ctx.fillStyle=C.muted;ctx.lineWidth=1;ctx.font="10px sans-serif";'
+      + 'ctx.textAlign="center";ctx.textBaseline="top";'
+      + 'for(var xt=0;xt<=D.xMax;xt+=xStep){var xx=X(xt);ctx.globalAlpha=0.6;ctx.beginPath();ctx.moveTo(xx,m.t);ctx.lineTo(xx,m.t+ph);ctx.stroke();ctx.globalAlpha=1;ctx.fillText(String(Math.round(xt*10)/10),xx,m.t+ph+6);}'
+      + 'ctx.textAlign="right";ctx.textBaseline="middle";'
+      + 'for(var yt=yLo;yt<=yHi;yt++){var yy=Y(Math.pow(10,yt));ctx.globalAlpha=0.6;ctx.beginPath();ctx.moveTo(m.l,yy);ctx.lineTo(m.l+pw,yy);ctx.stroke();ctx.globalAlpha=1;ctx.fillText("1e"+yt,m.l-6,yy);}'
+      // ---- PSD curve ----
+      + 'ctx.strokeStyle=C.curve;ctx.lineWidth=1.5;ctx.beginPath();'
+      + 'for(var k=0;k<D.fx.length;k++){var px=X(D.fx[k]),py=Y(D.fy[k]);if(k===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}'
+      + 'ctx.stroke();'
+      // ---- frame + axis titles ----
+      + 'ctx.strokeStyle=C.border;ctx.lineWidth=1;ctx.strokeRect(m.l,m.t,pw,ph);'
+      + 'ctx.fillStyle=C.text;ctx.font="11px sans-serif";'
+      + 'ctx.textAlign="center";ctx.textBaseline="bottom";'
+      + 'ctx.fillText("Frequency (Hz)",m.l+pw/2,H-2);'
+      + 'ctx.save();ctx.translate(14,m.t+ph/2);ctx.rotate(-Math.PI/2);'
+      + 'ctx.textBaseline="top";ctx.fillText("PSD (log scale)",0,0);ctx.restore();'
+      + '})();<\/script></body></html>';
+    return html;
+  }
+
+  function openPSDPlot(){
+    const prep = _preparePSD();
+    if(!prep.ok){ alert(prep.reason); return; }
+    const html = _buildPSDHTML(prep.payload, prep.colors);
+    const w = window.open('', 'psd_' + Date.now(), 'width=600,height=680,menubar=no,toolbar=no,location=no,status=no');
+    if(!w){ alert('Could not open a new window. Please allow pop-ups for this page.'); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
+
+  const btnPSD = document.getElementById('btnPSDPlot');
+  if(btnPSD){
+    btnPSD.addEventListener('click', ()=>{
+      try{ openPSDPlot(); }
+      catch(e){ console.error('PSD plot failed', e); alert('PSD plot failed: ' + (e.message||String(e))); }
+    });
+  }
 
 
   // ======== Load WFDB record or CSV ========
@@ -3264,6 +4012,80 @@ if(btnRRRemove){
   const plotDiv = document.getElementById('plot');
   let currentChannel=0;
 
+  // Standalone duplicate of the trace-building logic inside drawCurrentChannel(),
+  // used only by the report's "full-record overview" ECG image so that image
+  // can be rendered off-screen without touching the live chart/zoom in any way.
+  // Kept independent (not a shared call site) so drawCurrentChannel's proven
+  // behavior is never at risk from report-page changes.
+  function _buildChannelTraces(idx){
+    const sig = state.signals[idx];
+    if(!sig) return [];
+    const xData = Array.from({length: sig.length}, (_, i) => idxToDisplayX(i));
+    const yData = Array.from(sig);
+    const traces = [{x:xData, y:yData, type:'scatter', mode:'lines', name:state.channelNames[idx]||`CH${idx}`, line:{color:'#3b82f6'}}];
+
+    function addPeakTrace(peakType, color, name) {
+      if(peakType === 'R'){
+        const rPeaks = state.peaks.R[idx]||[];
+        const beatTypes = {};
+        for(const peak of rPeaks){
+          const bt = peak.type || 'N';
+          if(!beatTypes[bt]) beatTypes[bt] = [];
+          beatTypes[bt].push(peak.index);
+        }
+        for(const [beatType, indices] of Object.entries(beatTypes)){
+          const validPeaks = indices.filter(p=>p>=0 && p<sig.length);
+          if(validPeaks.length){
+            const validYvals = validPeaks.map(p=>sig[p]).filter(y=>isFinite(y));
+            if(validYvals.length === validPeaks.length){
+              traces.push({
+                x:idxArrToDisplayX(validPeaks),
+                y:validYvals,
+                type:'scatter',
+                mode:'markers',
+                name:`R-${beatType}`,
+                marker:{color:getRBeatColor(beatType), size:8},
+                hovertext: validPeaks.map(p=>`R-peak [${beatType}] @ ${p}`)
+              });
+            }
+          }
+        }
+        try{
+          for(const t of buildRRReviewTraces(idx, sig)) traces.push(t);
+        }catch(_e){ console.warn('RR review overlay failed', _e); }
+      } else {
+        const peaks = (state.peaks[peakType][idx]||[]).filter(p=>p>=0 && p<sig.length);
+        if(peaks.length){
+          const validPeaks = [];
+          const validYvals = [];
+          for(const p of peaks) {
+            const yVal = sig[p];
+            if(isFinite(yVal)) { validPeaks.push(p); validYvals.push(yVal); }
+          }
+          if(validPeaks.length) {
+            traces.push({
+              x:idxArrToDisplayX(validPeaks),
+              y:validYvals,
+              type:'scatter',
+              mode:'markers',
+              name:name,
+              marker:{color:color, size:8},
+              hovertext: validPeaks.map(p=>`${name} @ ${p}`)
+            });
+          }
+        }
+      }
+    }
+
+    addPeakTrace('R', '#ef4444', 'R');
+    addPeakTrace('P', '#22c55e', 'P');
+    addPeakTrace('Q', '#06b6d4', 'Q');
+    addPeakTrace('S', '#ec4899', 'S');
+    addPeakTrace('T', '#a78bfa', 'T');
+    addPeakTrace('U', '#f59e0b', 'U');
+    return traces;
+  }
+
   async function drawCurrentChannel(){
     const idx = parseInt(document.getElementById('selChannel').value||'0');
     currentChannel=idx;
@@ -3305,7 +4127,7 @@ if(btnRRRemove){
           }
         }
 
-        // RR review overlay: hollow status rings + coloured interval segments.
+        // RR review overlay: hollow status rings + colored interval segments.
         // The original R-peak markers above keep their beat-type fill.
         try{
           for(const t of buildRRReviewTraces(idx, sig)) traces.push(t);
@@ -5362,12 +6184,12 @@ if(btnRRRemove){
   // ---------- segment context ----------
   // Everything downstream is derived from THIS object, so a stored correction
   // can never leak across channels or visible segments.
-  function _rrContext(){
+  function _rrContext(chOverride, s0Override, s1Override){
     if(!state.fs) return null;
-    const ch = currentChannel;
+    const ch = (chOverride != null) ? chOverride : currentChannel;
     ensureRPeakMeta(ch);
     sortRPeaks(ch);
-    const [s0,s1] = _getVisibleSampleRange();
+    const [s0,s1] = _getVisibleSampleRange(s0Override, s1Override);
     const win = (state.peaks.R[ch]||[]).filter(p=> Number.isFinite(p.index) && p.index>=s0 && p.index<=s1);
     const rrMs = [];
     for(let i=1;i<win.length;i++) rrMs.push((win[i].index - win[i-1].index)/state.fs*1000);
@@ -6266,8 +7088,8 @@ if(btnRRRemove){
 
   /* ==========================================================================
      §3  OVERLAY RENDERING
-     The original R-peak marker (and its beat-type colour) is never replaced.
-     RR status is shown as a HOLLOW RING plus a coloured segment spanning the
+     The original R-peak marker (and its beat-type color) is never replaced.
+     RR status is shown as a HOLLOW RING plus a colored segment spanning the
      interval, because an RR interval is not a single point.
      ========================================================================== */
   const RR_RING = {
@@ -6330,7 +7152,7 @@ if(btnRRRemove){
         hovertext:ht, hoverinfo:'text', showlegend:false});
     }
 
-    // --- rings + interval segments, grouped by status colour
+    // --- rings + interval segments, grouped by status color
     const byKey = {};
     const segX = {}, segY = {}, segHT = {};
     for(const c of cases){
@@ -6805,6 +7627,373 @@ if(btnRRRemove){
     });
   })();
 
+  // ======== Report generation (printable / PDF-via-print) ========
+
+  // Renders a self-contained plot-popup HTML document (as produced by the
+  // _buildXxxHTML() functions above) into a hidden, off-screen same-origin
+  // iframe, then reads back the resulting canvas as a PNG data URL. The
+  // popups' own inline <script> tags run synchronously during
+  // document.write()/close(), so the canvas is already fully drawn by the
+  // time we read it -- no extra waiting/events needed.
+  function _captureCanvasPNG(html, canvasId, cssW, cssH){
+    return new Promise((resolve)=>{
+      let ifr = null;
+      try{
+        ifr = document.createElement('iframe');
+        ifr.style.position = 'fixed';
+        ifr.style.left = '-10000px';
+        ifr.style.top = '0';
+        ifr.style.width = (cssW||650) + 'px';
+        ifr.style.height = (cssH||750) + 'px';
+        ifr.style.border = '0';
+        document.body.appendChild(ifr);
+        const doc = ifr.contentDocument || (ifr.contentWindow && ifr.contentWindow.document);
+        if(!doc){ document.body.removeChild(ifr); resolve(null); return; }
+        doc.open();
+        doc.write(html);
+        doc.close();
+        let dataUrl = null;
+        try{
+          const cv = doc.getElementById(canvasId);
+          if(cv) dataUrl = cv.toDataURL('image/png');
+        }catch(e){ dataUrl = null; }
+        document.body.removeChild(ifr);
+        resolve(dataUrl);
+      }catch(e){
+        console.warn('Report: canvas capture failed', e);
+        try{ if(ifr && ifr.parentNode) ifr.parentNode.removeChild(ifr); }catch(_e){}
+        resolve(null);
+      }
+    });
+  }
+
+  // Returns a PNG data URL of the main ECG chart.
+  //   mode 'current' : exactly what's on screen right now (current zoom/pan,
+  //                    peak markers) -- via Plotly's own image export, no
+  //                    redraw, so the live chart is never touched.
+  //   mode 'full'     : the whole record for the given channel (or the live
+  //                    channel if none given), autoscaled, rendered into a
+  //                    temporary off-screen div so the on-screen chart/zoom
+  //                    is completely unaffected.
+  async function reportGetECGImage(mode, ch){
+    try{
+      if(mode === 'current'){
+        if(typeof Plotly === 'undefined' || !plotDiv || !plotDiv.data || !plotDiv.data.length) return null;
+        return await Plotly.toImage(plotDiv, {format:'png', width:1000, height:420, scale:2});
+      }
+      if(mode === 'full'){
+        const idx = (ch != null) ? ch : currentChannel;
+        if(!state.signals[idx]) return null;
+        const traces = _buildChannelTraces(idx);
+        const themeStyles = getComputedStyle(document.documentElement);
+        const panelBg = (themeStyles.getPropertyValue('--panel')||'').trim() || '#ffffff';
+        const textCol = (themeStyles.getPropertyValue('--text')||'').trim() || '#111827';
+        const gridCol = (themeStyles.getPropertyValue('--border')||'').trim() || '#e5e7eb';
+        const layout = {
+          margin:{l:50, r:20, t:20, b:40},
+          paper_bgcolor: panelBg, plot_bgcolor: panelBg, font:{color:textCol},
+          xaxis:{title:xAxisUnitTitle(), gridcolor:gridCol, zerolinecolor:gridCol},
+          yaxis:{title:'Amplitude (' + (state.units[idx]||'mV') + ')', gridcolor:gridCol, zerolinecolor:gridCol},
+          showlegend:false, width:1000, height:420
+        };
+        const off = document.createElement('div');
+        off.style.position = 'fixed'; off.style.left = '-10000px'; off.style.top = '0';
+        off.style.width = '1000px'; off.style.height = '420px';
+        document.body.appendChild(off);
+        let url = null;
+        try{
+          await Plotly.newPlot(off, traces, layout, {staticPlot:true});
+          url = await Plotly.toImage(off, {format:'png', width:1000, height:420, scale:2});
+        }catch(e){ console.warn('Report: full-overview ECG render failed', e); }
+        try{ Plotly.purge(off); }catch(_e){}
+        try{ document.body.removeChild(off); }catch(_e){}
+        return url;
+      }
+    }catch(e){
+      console.warn('Report: ECG image capture failed', e);
+      return null;
+    }
+    return null;
+  }
+
+  function openReportPage(){
+    if(!state.nSamples || !state.fs){
+      alert('Load a record before generating a report.');
+      return;
+    }
+    const meta = reportGetMeta();
+    const [vs0, vs1] = _getVisibleSampleRange();
+    const initData = {
+      recordBase: meta.recordBase, channelNames: meta.channelNames, nSamples: meta.nSamples,
+      fs: meta.fs, duration: meta.duration, currentChannel: meta.currentChannel,
+      visStartS: state.fs ? (vs0/state.fs) : 0, visEndS: state.fs ? (vs1/state.fs) : (meta.duration||0)
+    };
+
+    const w = window.open('', 'report_' + Date.now(), 'width=920,height=860');
+    if(!w){ alert('Could not open a new window. Please allow pop-ups for this page.'); return; }
+
+    const html = '<!doctype html><html><head><meta charset="utf-8"/>'
+      + '<meta name="viewport" content="width=device-width, initial-scale=1"/>'
+      + '<title>CardioAnnotate Report</title>'
+      + '<style>'
+      + ':root{--rbg:#f1f5f9;--rpanel:#ffffff;--rborder:#e2e8f0;--rtext:#0f172a;--rmuted:#64748b;--raccent:#2563eb;}'
+      + '*{box-sizing:border-box;}'
+      + 'html,body{margin:0;background:var(--rbg);color:var(--rtext);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}'
+      + '.wrap{max-width:880px;margin:0 auto;padding:20px 20px 60px 20px;}'
+      + 'h1{font-size:20px;margin:0 0 4px 0;}'
+      + 'h2{font-size:15px;margin:0 0 8px 0;padding-bottom:6px;border-bottom:2px solid var(--rborder);}'
+      + 'label{display:block;font-size:12.5px;font-weight:600;color:var(--rmuted);margin:10px 0 4px 0;}'
+      + 'input[type=text],input[type=number],textarea,select{width:100%;padding:7px 9px;border:1px solid var(--rborder);border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:var(--rtext);}'
+      + 'textarea{min-height:60px;resize:vertical;}'
+      + '.row{display:flex;gap:14px;flex-wrap:wrap;}'
+      + '.row>div{flex:1;min-width:160px;}'
+      + '.chkgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px;margin-top:6px;}'
+      + '.chkgrid label{display:flex;align-items:center;gap:7px;font-weight:400;color:var(--rtext);font-size:13px;margin:0;}'
+      + '.chkgrid input{width:auto;}'
+      + '.card{background:var(--rpanel);border:1px solid var(--rborder);border-radius:10px;padding:16px 18px;margin-bottom:16px;}'
+      + '.btn{font-size:13px;padding:9px 16px;border-radius:8px;cursor:pointer;border:1px solid var(--rborder);background:#fff;color:var(--rtext);}'
+      + '.btn.primary{background:var(--raccent);border-color:var(--raccent);color:#fff;font-weight:600;}'
+      + '.btn:disabled{opacity:0.6;cursor:default;}'
+      + '.radiorow{display:flex;gap:16px;align-items:center;margin-top:6px;font-size:13px;}'
+      + '.radiorow label{display:flex;align-items:center;gap:6px;font-weight:400;color:var(--rtext);margin:0;}'
+      + '.hint{font-size:11px;color:var(--rmuted);margin-top:4px;}'
+      + '#reportView{display:none;}'
+      + '.rpt-topbar{display:flex;gap:10px;margin-bottom:16px;}'
+      + '.rpt-header{margin-bottom:18px;}'
+      + '.rpt-header .sub{font-size:12.5px;color:var(--rmuted);margin-top:2px;}'
+      + '.rpt-notes{margin-top:10px;font-size:12.5px;background:#f8fafc;border:1px solid var(--rborder);border-radius:8px;padding:8px 10px;white-space:pre-wrap;}'
+      + '.rpt-section{page-break-inside:avoid;break-inside:avoid;margin-bottom:18px;}'
+      + 'table.rpt-table{width:100%;border-collapse:collapse;font-size:12.5px;}'
+      + 'table.rpt-table td{padding:5px 8px;border-bottom:1px solid var(--rborder);}'
+      + 'table.rpt-table td:first-child{color:var(--rmuted);width:45%;}'
+      + '.rpt-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}'
+      + '.rpt-stat{background:#f8fafc;border:1px solid var(--rborder);border-radius:8px;padding:8px 10px;}'
+      + '.rpt-stat .k{font-size:11px;color:var(--rmuted);}'
+      + '.rpt-stat .v{font-size:15px;font-weight:700;margin-top:2px;}'
+      + '.rpt-img{max-width:100%;display:block;border:1px solid var(--rborder);border-radius:8px;margin:0 auto;}'
+      + '.rpt-unavail{font-size:12.5px;color:var(--rmuted);font-style:italic;}'
+      + '@media print{'
+      + '.no-print{display:none !important;}'
+      + 'body{background:#fff;}'
+      + '.wrap{max-width:none;padding:0;}'
+      + '.card{border:none;padding:0;box-shadow:none;}'
+      + '}'
+      + '</style></head><body>'
+      + '<div class="wrap">'
+
+      + '<div id="optionsView">'
+      + '<h1>CardioAnnotate &mdash; Build report</h1>'
+      + '<div class="hint" style="margin-bottom:14px">Choose a channel and segment, pick what to include, then Generate. You can print or save as PDF from the next screen.</div>'
+      + '<div class="card">'
+      + '<label>Report title</label><input type="text" id="rptTitle" placeholder="CardioAnnotate Report"/>'
+      + '<label>Notes (optional)</label><textarea id="rptNotes" placeholder="Any context to include on the report, e.g. patient/session notes."></textarea>'
+      + '<div class="row">'
+      + '<div><label>Channel</label><select id="rptChannel"></select></div>'
+      + '<div><label>ECG plot image</label><select id="rptEcgMode">'
+      + '<option value="current">Current on-screen view</option>'
+      + '<option value="full">Full-record overview</option>'
+      + '<option value="both">Both</option>'
+      + '</select></div>'
+      + '</div>'
+      + '<label>Segment (used for RR tachogram, ECG PSD, Poincar&eacute;, HRV PSD, SQI, and the summary stats)</label>'
+      + '<div class="radiorow">'
+      + '<label><input type="radio" name="rptSegMode" value="full" checked/> Full record</label>'
+      + '<label><input type="radio" name="rptSegMode" value="custom"/> Custom range (s)</label>'
+      + '</div>'
+      + '<div class="row" id="rptCustomRange" style="display:none;margin-top:8px">'
+      + '<div><label>Start (s)</label><input type="number" id="rptStartS" step="0.1"/></div>'
+      + '<div><label>End (s)</label><input type="number" id="rptEndS" step="0.1"/></div>'
+      + '</div>'
+      + '</div>'
+
+      + '<div class="card">'
+      + '<label style="margin-top:0">Sections to include</label>'
+      + '<div class="chkgrid">'
+      + '<label><input type="checkbox" id="chkMeta" checked/> Record metadata</label>'
+      + '<label><input type="checkbox" id="chkPeaks" checked/> Peak counts</label>'
+      + '<label><input type="checkbox" id="chkStats" checked/> Summary stats (RR/HR/PR/QT/QRS)</label>'
+      + '<label><input type="checkbox" id="chkSqi" checked/> Signal quality (SQI)</label>'
+      + '<label><input type="checkbox" id="chkHrv" checked/> HRV metrics</label>'
+      + '<label><input type="checkbox" id="chkRRTach" checked/> RR-interval tachogram</label>'
+      + '<label><input type="checkbox" id="chkEcgPsd" checked/> ECG PSD plot</label>'
+      + '<label><input type="checkbox" id="chkPoincare" checked/> Poincar&eacute; plot</label>'
+      + '<label><input type="checkbox" id="chkHrvPsd" checked/> HRV PSD plot</label>'
+      + '</div>'
+      + '</div>'
+
+      + '<button id="btnGenerate" class="btn primary">Generate report</button>'
+      + '</div>'
+
+      + '<div id="reportView">'
+      + '<div class="rpt-topbar no-print">'
+      + '<button id="btnBack" class="btn">&larr; Back to options</button>'
+      + '<button id="btnPrint" class="btn primary">&#128424; Print / Save as PDF</button>'
+      + '</div>'
+      + '<div id="reportBody"></div>'
+      + '</div>'
+
+      + '</div>'
+      + '<script>(function(){'
+      + 'var META=' + JSON.stringify(initData) + ';'
+      + 'var chSel=document.getElementById("rptChannel");'
+      + 'for(var i=0;i<META.channelNames.length;i++){var o=document.createElement("option");o.value=String(i);o.textContent=META.channelNames[i];if(i===META.currentChannel)o.selected=true;chSel.appendChild(o);}'
+      + 'document.getElementById("rptStartS").value=Math.round(META.visStartS*100)/100;'
+      + 'document.getElementById("rptEndS").value=Math.round(META.visEndS*100)/100;'
+      + 'var radios=document.getElementsByName("rptSegMode");'
+      + 'for(var r=0;r<radios.length;r++){radios[r].addEventListener("change",function(){'
+      + 'document.getElementById("rptCustomRange").style.display=(this.value==="custom")?"flex":"none";'
+      + '});}'
+      + 'function fmt(x,d){return (x==null||!isFinite(x))?"\\u2014":Number(x).toFixed(d);}'
+      + 'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}'
+      + 'function sectionOpen(title){return "<div class=\\"rpt-section\\"><h2>"+esc(title)+"</h2>";}'
+      + 'function sectionClose(){return "</div>";}'
+      + 'function unavailHtml(title,reason){return sectionOpen(title)+"<div class=\\"rpt-unavail\\">"+esc(reason||"Not available.")+"</div>"+sectionClose();}'
+      + 'function imgHtml(title,dataUrl){return sectionOpen(title)+"<img class=\\"rpt-img\\" src=\\""+dataUrl+"\\"/>"+sectionClose();}'
+      + 'function metaHtml(m){'
+      + 'var rows=[["Record",esc(m.recordBase||"\\u2014")],["Channels",String(m.channelNames.length||0)],'
+      + '["Samples",(m.nSamples||0).toLocaleString()],["Sampling frequency",m.fs?(m.fs+" Hz"):"\\u2014"],'
+      + '["Duration",m.duration!=null?fmt(m.duration,2)+" s":"\\u2014"],["Channel list",esc(m.channelNames.join(", ")||"\\u2014")]];'
+      + 'var h=sectionOpen("Record metadata")+"<table class=\\"rpt-table\\">";'
+      + 'for(var i=0;i<rows.length;i++){h+="<tr><td>"+rows[i][0]+"</td><td>"+rows[i][1]+"</td></tr>";}'
+      + 'h+="</table>"+sectionClose();return h;'
+      + '}'
+      + 'function peaksHtml(pk){'
+      + 'var order=["R","P","Q","S","T","U"];'
+      + 'var h=sectionOpen("Peak counts")+"<div class=\\"rpt-grid\\">";'
+      + 'for(var i=0;i<order.length;i++){var t=order[i];var d=pk[t]||{total:0,breakdown:{}};'
+      + 'var sub="";'
+      + 'if(t==="R"){var parts=[];var bd=d.breakdown||{};for(var bt in bd){parts.push([bt,bd[bt]]);}'
+      + 'parts.sort(function(a,b){return b[1]-a[1];});'
+      + 'var names=[];for(var j=0;j<parts.length;j++){var nm=(window.opener&&window.opener.getRBeatName)?window.opener.getRBeatName(parts[j][0]):parts[j][0];names.push(nm+":"+parts[j][1]);}'
+      + 'sub=names.join(" &middot; ");}'
+      + 'h+="<div class=\\"rpt-stat\\"><div class=\\"k\\">"+t+"-peaks</div><div class=\\"v\\">"+d.total+"</div>"'
+      + '+(sub?"<div class=\\"hint\\" style=\\"margin-top:4px\\">"+sub+"</div>":"")+"</div>";'
+      + '}'
+      + 'h+="</div>"+sectionClose();return h;'
+      + '}'
+      + 'function statsHtml(st){'
+      + 'var items=[["Duration",st.dur!=null?fmt(st.dur,2)+" s":"\\u2014"],["Avg RR",fmt(st.avgRR,1)+" ms"],'
+      + '["Avg HR",fmt(st.avgHR,1)+" bpm"],["Avg PR",fmt(st.avgPR,1)+" ms"],["Avg QT",fmt(st.avgQT,1)+" ms"],["Avg QRS",fmt(st.avgQRS,1)+" ms"]];'
+      + 'var h=sectionOpen("Summary statistics")+"<div class=\\"rpt-grid\\">";'
+      + 'for(var i=0;i<items.length;i++){h+="<div class=\\"rpt-stat\\"><div class=\\"k\\">"+items[i][0]+"</div><div class=\\"v\\">"+items[i][1]+"</div></div>";}'
+      + 'h+="</div>"+sectionClose();return h;'
+      + '}'
+      + 'function sqiHtml(sq){'
+      + 'if(!sq||!sq.ok){return unavailHtml("Signal quality (SQI)","Segment too short or no valid channel selected.");}'
+      + 'var items=[["pSQI (5\\u201315/5\\u201340)",fmt(sq.p,3)],["kSQI (kurtosis)",fmt(sq.k,2)],'
+      + '["basSQI (1\\u2212 0\\u20131/0\\u201340)",fmt(sq.bas,3)],["lineSQI (mains ratio)",fmt(sq.line,6)]];'
+      + 'var h=sectionOpen("Signal quality (SQI)")+"<div class=\\"rpt-grid\\">";'
+      + 'for(var i=0;i<items.length;i++){h+="<div class=\\"rpt-stat\\"><div class=\\"k\\">"+items[i][0]+"</div><div class=\\"v\\">"+items[i][1]+"</div></div>";}'
+      + 'h+="</div>"+sectionClose();return h;'
+      + '}'
+      + 'function hrvHtml(hv){'
+      + 'if(!hv||!hv.ok){return unavailHtml("HRV metrics",(hv&&hv.reason)?hv.reason:"Need \\u22652 R-peaks in the segment.");}'
+      + 'var items=[["Mean NN / RR",fmt(hv.meanNN,1)+" ms"],["SDNN",fmt(hv.sdnn,1)+" ms"],["RMSSD",fmt(hv.rmssd,1)+" ms"],'
+      + '["NN50",isFinite(hv.nn50)?String(hv.nn50):"\\u2014"],["pNN50",fmt(hv.pnn50,1)+" %"],'
+      + '["Poincar\\u00e9 SD1",fmt(hv.sd1,1)+" ms"],["Poincar\\u00e9 SD2",fmt(hv.sd2,1)+" ms"],["SD2/SD1",fmt(hv.sd2sd1,2)],'
+      + '["SampEn",fmt(hv.sampen,3)],'
+      + '["ULF power",hv.ulf===null?"\\u2014":fmt(hv.ulf,2)+" ms\\u00b2"],["VLF power",hv.vlf===null?"\\u2014":fmt(hv.vlf,2)+" ms\\u00b2"],'
+      + '["LF power",hv.lf===null?"\\u2014":fmt(hv.lf,2)+" ms\\u00b2"],["HF power",hv.hf===null?"\\u2014":fmt(hv.hf,2)+" ms\\u00b2"],'
+      + '["LF/HF ratio",fmt(hv.lfhf,2)]];'
+      + 'var h=sectionOpen("HRV metrics")+"<div class=\\"rpt-grid\\">";'
+      + 'for(var i=0;i<items.length;i++){h+="<div class=\\"rpt-stat\\"><div class=\\"k\\">"+items[i][0]+"</div><div class=\\"v\\">"+items[i][1]+"</div></div>";}'
+      + 'h+="</div>"+sectionClose();return h;'
+      + '}'
+      + 'document.getElementById("btnGenerate").addEventListener("click", function(){'
+      + 'var btn=this;'
+      + 'if(!window.opener||window.opener.closed){alert("The main CardioAnnotate tab is no longer available. Please reopen the report from the app.");return;}'
+      + 'btn.disabled=true;var oldText=btn.textContent;btn.textContent="Generating\\u2026";'
+      + '(async function(){'
+      + 'try{'
+      + 'var ch=parseInt(chSel.value,10);'
+      + 'var segMode=document.querySelector("input[name=\\"rptSegMode\\"]:checked").value;'
+      + 'var s0,s1;'
+      + 'if(segMode==="custom"){'
+      + 'var startS=parseFloat(document.getElementById("rptStartS").value);'
+      + 'var endS=parseFloat(document.getElementById("rptEndS").value);'
+      + 'if(isFinite(startS)&&isFinite(endS)&&META.fs){s0=Math.round(startS*META.fs);s1=Math.round(endS*META.fs);}'
+      + 'else{s0=0;s1=META.nSamples-1;}'
+      + '}else{s0=0;s1=META.nSamples-1;}'
+      + 'var title=document.getElementById("rptTitle").value||"CardioAnnotate Report";'
+      + 'var notes=document.getElementById("rptNotes").value||"";'
+      + 'var chName=META.channelNames[ch]||("CH"+ch);'
+      + 'var segLabel=(segMode==="custom")?(fmt(s0/META.fs,2)+"\\u2013"+fmt(s1/META.fs,2)+" s"):("Full record (0\\u2013"+fmt(META.duration,2)+" s)");'
+      + 'var now=new Date();'
+      + 'var html="<div class=\\"rpt-header\\"><h1>"+esc(title)+"</h1>"'
+      + '+"<div class=\\"sub\\">Record: "+esc(META.recordBase||"\\u2014")+" &middot; Channel: "+esc(chName)+" &middot; Segment: "+segLabel+"</div>"'
+      + '+"<div class=\\"sub\\">Generated "+esc(now.toLocaleString())+"</div>"'
+      + '+(notes?("<div class=\\"rpt-notes\\">"+esc(notes)+"</div>"):"")'
+      + '+"</div>";'
+      + 'if(document.getElementById("chkMeta").checked){html+=metaHtml(window.opener.reportGetMeta());}'
+      + 'if(document.getElementById("chkPeaks").checked){html+=peaksHtml(window.opener.reportGetPeakCounts());}'
+      + 'if(document.getElementById("chkStats").checked){html+=statsHtml(window.opener.computeStatsForChannel(ch));}'
+      + 'if(document.getElementById("chkSqi").checked){html+=sqiHtml(window.opener.computeSQIForVisibleSegment({channel:ch,s0:s0,s1:s1}));}'
+      + 'if(document.getElementById("chkHrv").checked){html+=hrvHtml(window.opener.computeHRVForVisibleSegment({channel:ch,s0:s0,s1:s1,writeUI:false}));}'
+      + 'var ecgMode=document.getElementById("rptEcgMode").value;'
+      + 'if(ecgMode==="current"||ecgMode==="both"){'
+      + 'var imgCur=await window.opener.reportGetECGImage("current");'
+      + 'html+=imgCur?imgHtml("ECG (current view)",imgCur):unavailHtml("ECG (current on-screen view)","Could not render the current view.");'
+      + '}'
+      + 'if(ecgMode==="full"||ecgMode==="both"){'
+      + 'var imgFull=await window.opener.reportGetECGImage("full",ch);'
+      + 'html+=imgFull?imgHtml("ECG (full-record overview) ("+esc(chName)+")",imgFull):unavailHtml("ECG (full-record overview)","Could not render the full record.");'
+      + '}'
+      + 'if(document.getElementById("chkRRTach").checked){'
+      + 'var prepRR=window.opener._prepareRRInterval(ch,s0,s1);'
+      + 'if(prepRR.ok){var h1=window.opener._buildRRIntervalHTML(prepRR.payload,prepRR.colors);var img1=await window.opener._captureCanvasPNG(h1,"pc",650,700);'
+      + 'html+=img1?imgHtml("RR-interval tachogram",img1):unavailHtml("RR-interval tachogram","Could not render the plot.");}'
+      + 'else{html+=unavailHtml("RR-interval tachogram",prepRR.reason);}'
+      + '}'
+      + 'if(document.getElementById("chkEcgPsd").checked){'
+      + 'var prepPsd=window.opener._preparePSD(ch,s0,s1);'
+      + 'if(prepPsd.ok){var h2=window.opener._buildPSDHTML(prepPsd.payload,prepPsd.colors);var img2=await window.opener._captureCanvasPNG(h2,"pc",650,700);'
+      + 'html+=img2?imgHtml("ECG power spectral density",img2):unavailHtml("ECG power spectral density","Could not render the plot.");}'
+      + 'else{html+=unavailHtml("ECG power spectral density",prepPsd.reason);}'
+      + '}'
+      + 'if(document.getElementById("chkPoincare").checked){'
+      + 'var prepPo=window.opener._preparePoincare(ch,s0,s1);'
+      + 'if(prepPo.ok){var h3=window.opener._buildPoincareHTML(prepPo.payload,prepPo.colors);var img3=await window.opener._captureCanvasPNG(h3,"pc",650,700);'
+      + 'html+=img3?imgHtml("Poincar\\u00e9 plot",img3):unavailHtml("Poincar\\u00e9 plot","Could not render the plot.");}'
+      + 'else{html+=unavailHtml("Poincar\\u00e9 plot",prepPo.reason);}'
+      + '}'
+      + 'if(document.getElementById("chkHrvPsd").checked){'
+      + 'var prepHP=window.opener._prepareHRVPSD(ch,s0,s1);'
+      + 'if(prepHP.ok){var h4=window.opener._buildHRVPSDHTML(prepHP.payload,prepHP.colors);var img4=await window.opener._captureCanvasPNG(h4,"pc",650,700);'
+      + 'html+=img4?imgHtml("HRV power spectral density",img4):unavailHtml("HRV power spectral density","Could not render the plot.");}'
+      + 'else{html+=unavailHtml("HRV power spectral density",prepHP.reason);}'
+      + '}'
+      + 'document.getElementById("reportBody").innerHTML=html;'
+      + 'document.getElementById("optionsView").style.display="none";'
+      + 'document.getElementById("reportView").style.display="block";'
+      + 'window.scrollTo(0,0);'
+      + '}catch(e){'
+      + 'console.error(e);'
+      + 'alert("Report generation failed: "+(e&&e.message?e.message:String(e)));'
+      + '}finally{'
+      + 'btn.disabled=false;btn.textContent=oldText;'
+      + '}'
+      + '})();'
+      + '});'
+      + 'document.getElementById("btnBack").addEventListener("click",function(){'
+      + 'document.getElementById("reportView").style.display="none";'
+      + 'document.getElementById("optionsView").style.display="block";'
+      + '});'
+      + 'document.getElementById("btnPrint").addEventListener("click",function(){window.print();});'
+      + '})();<\/script></body></html>';
+
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
+
+  const btnOpenReport = document.getElementById('btnOpenReport');
+  if(btnOpenReport){
+    btnOpenReport.addEventListener('click', ()=>{
+      try{ openReportPage(); }
+      catch(e){ console.error('Report generation failed', e); alert('Report generation failed: ' + (e.message||String(e))); }
+    });
+  }
+
   // ---------- boot ----------
   ensureAllRPeakMeta();
   renderRRReviewSummary();
@@ -6819,6 +8008,14 @@ if(btnRRRemove){
       <button id="btnCloseChangelog" title="Close">✕</button>
     </header>
     <div class="cl-body">
+      <h3><span class="tag pre">PRE-RELEASE</span> v0.3.0 — PSD visualization and report generation</h3>
+      <ul>
+        <li>New <b>Report generation</b> Include the ability to generate and print reports of the analysis.</li>
+        <li>New <b>PSD plot</b> window (Statistics → Signal quality): shows the Welch power spectral density of the visible ECG segment for the active channel, with the SQI subbands shaded on the curve — baseline (0–1 Hz), QRS band (5–15 Hz), the 5–40 Hz pSQI/basSQI window, and the mains ± width band — alongside a live pSQI / kSQI / basSQI / lineSQI readout.</li>
+        <li>New <b>HRV PSD plot</b> window (Statistics → HRV): shows the RR-interval power spectrum (4 Hz-interpolated periodogram) with the ULF / VLF / LF / HF bands shaded and a live band-power readout, plus a linear/log frequency-axis toggle (default linear, matching standard HRV convention).</li>
+        <li>New <b>RR interval plot</b> window (Statistics → HRV): shows the RR-interval tachogram for the visible segment, with a time/beat-number x-axis toggle and a "show flagged intervals" toggle that bridges flagged/excluded intervals onto the curve with a dashed segment instead of leaving them disconnected.</li>
+        <li>Internal: <code>computeSQIForVisibleSegment</code> and <code>computeHRVForVisibleSegment</code> now additionally expose their underlying frequency/PSD arrays so both plots can reuse the spectra already computed for the SQI ratios and ULF/VLF/LF/HF band powers, instead of recomputing them. No change to any existing SQI or HRV numeric output.</li>
+      </ul>
       <h3><span class="tag pre">PRE-RELEASE</span> v0.2.0 — RR review &amp; annotation-consistent correction</h3>
       <ul>
         <li>The combined RR outlier / GP-imputation / auto-insert / auto-delete routine has been split into four explicit stages: <b>Detection → structural suggestion → preview → apply</b>. No R-peak is ever added, deleted or moved without a deliberate user action.</li>
@@ -6827,7 +8024,7 @@ if(btnRRRemove){
         <li>New structural classifiers for false-positive and misplaced R peaks, with configurable thresholds (α, β, γ, gap ratio, local-median window) exposed in the UI.</li>
         <li>Corrected RR is now <b>geometrically consistent</b> with the displayed R-peak positions: GP predicts intervals jointly inside fixed bounding peaks and the predictions are conditioned on the observed bounding duration, then peaks are repositioned and RR is re-derived from the annotations.</li>
         <li>Missing-beat reconstruction no longer inserts equally spaced peaks: the local median only proposes a beat count, candidate counts are ranked, and positions come from the sum-constrained GP posterior.</li>
-        <li>Flagged markers redesigned. The original R-peak fill is retained and status is shown as a hollow ring plus a coloured interval segment (amber / blue / cyan / orange / magenta / green), with full hover detail.</li>
+        <li>Flagged markers redesigned. The original R-peak fill is retained and status is shown as a hollow ring plus a colored interval segment (amber / blue / cyan / orange / magenta / green), with full hover detail.</li>
         <li>Complete undo for all structural repairs, and cached RR corrections are invalidated on peak add/delete/move, re-detection, channel change, segment change and import.</li>
         <li>HRV fix: excluded intervals keep their sequence position as missing values, so RMSSD, NN50, pNN50 and the Poincaré descriptors only use originally adjacent pairs.</li>
         <li>GP defaults preserved: kernels, hyper-parameter values and RR-in-seconds convention are unchanged. GP now also reports posterior uncertainty, and is centred on the training mean (documented fix for a zero-mean posterior collapse).</li>
@@ -6846,7 +8043,7 @@ if(btnRRRemove){
 <!-- Footer -->
 <footer id="appFooter">
   © 2026 CardioAnnotate — All rights reserved &nbsp;|&nbsp;
-  <a class="ver-link" id="verLink" title="View changelog">v0.2.0</a>
+  <a class="ver-link" id="verLink" title="View changelog">v0.3.0</a>
 </footer>
 
 <script>
