@@ -350,6 +350,7 @@
     <span class="badge">100% client-side · No uploads</span>
     <span id="pyStatus" class="status loading">Initializing...</span>
     <div class="spacer"></div>
+    <button id="btnOpenECGExport" class="btn" title="Export the ECG on a calibrated clinical grid (25 mm/s, 10 mm/mV) for printing or saving as PDF">🫀 ECG export</button>
     <button id="btnOpenReport" class="btn" title="Build a printable/PDF report of the current record, stats, and plots">📄 Report</button>
     <button id="themeToggle" class="btn" title="Toggle dark/light mode" style="border-color:#94a3b8">🌙 Dark</button>
     <a href="help.html" target="_blank" class="help-link">📖 Help</a>
@@ -492,19 +493,32 @@ function openBibWindow(key) {
               <option value="h">Time (hours)</option>
             </select>
             <label>Mode</label>
-            <select id="selMode">
-              <option value="nav">Navigate</option>
-              <option value="addR">Add R (Normal)</option>
-              <option value="addP">Add P</option>
-              <option value="addT">Add T</option>
-              <option value="addU">Add U</option>
-              <option value="addQ">Add Q</option>
-              <option value="addS">Add S</option>
-              <option value="del">Remove nearest</option>
+            <select id="selMode" title="Annotation mode. Keyboard: 0 Navigate, 1 Add R, 2 Add P, 3 Add T, 4 Add U, 5 Add Q, 6 Add S, 7 Remove nearest.">
+              <option value="nav">Navigate [0]</option>
+              <option value="addR">Add R (Normal) [1]</option>
+              <option value="addP">Add P [2]</option>
+              <option value="addT">Add T [3]</option>
+              <option value="addU">Add U [4]</option>
+              <option value="addQ">Add Q [5]</option>
+              <option value="addS">Add S [6]</option>
+              <option value="del">Remove nearest [7]</option>
             </select>
             <button id="btnRemoveLast" class="btn warn">↶ Remove Last</button>
             <button id="btnClearPeaks" class="btn warn">Clear peaks</button>
+            <button id="btnUndoPeakOp" class="btn warn" disabled title="Nothing to undo (Ctrl+Z)">↶ Undo (Ctrl+Z)</button>
+            <button id="btnRedoPeakOp" class="btn warn" disabled title="Nothing to redo (Ctrl+Y)">↷ Redo (Ctrl+Y)</button>
             <button id="btnInvert" class="btn accent">Invert ECG</button>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)" title="Show the hover box with the x/y coordinates of the ECG trace under the pointer. Annotation tooltips are not affected, and clicking to annotate keeps working either way.">
+              <input id="chkHoverCoords" type="checkbox" checked />
+              Hover coordinates
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)" title="Show the hover box over an annotation marker: the peak type and sample for R/P/Q/S/T/U markers, and the full case detail for RR-review rings, interval segments and previews. Clicking a marker still works with this off, including clicking a flagged ring to open its review panel.">
+              <input id="chkAnnotTooltips" type="checkbox" checked />
+              Annotation tooltips
+            </label>
+          </div>
+          <div class="row" style="margin-bottom:8px;font-size:11px;color:var(--muted)">
+            Shortcuts: <b>0</b> Navigate · <b>1</b> R · <b>2</b> P · <b>3</b> T · <b>4</b> U · <b>5</b> Q · <b>6</b> S · <b>7</b> Remove nearest · <b>Ctrl+Z</b> undo · <b>Ctrl+Y</b> redo
           </div>
           <div class="row" style="margin-bottom:8px;padding:8px;background:#f9fafb;border-radius:8px">
             <div style="font-size:12px;color:#6b7280;margin-right:8px">Quick Classify R-peak:</div>
@@ -588,6 +602,10 @@ function openBibWindow(key) {
 
                 <label>Threshold</label>
                 <input id="fpThreshold" type="number" step="0.01" placeholder="(optional)" style="width:110px" />
+                <label style="font-size:12px;color:var(--muted)">(signal units)</label>
+
+                <label style="margin-left:8px" title="Required peak height, like SciPy find_peaks(height=...). Leave blank for no height limit. One number = minimum height. Two numbers (min, max) = minimum and maximum height; the first is always the minimum. Heights are compared against x for Maxima, -x (depth) for Minima, and |x| for |x| maxima.">Height</label>
+                <input id="fpHeight" type="text" placeholder="min  or  min, max" title="Blank = no limit; 'a' = height ≥ a; 'a, b' = a ≤ height ≤ b. For Minima, height is the depth -x (SciPy convention)." style="width:130px" />
                 <label style="font-size:12px;color:var(--muted)">(signal units)</label>
 
                 <label style="margin-left:8px">Prominence</label>
@@ -756,6 +774,26 @@ function openBibWindow(key) {
             </div>
             <p style="margin:4px 0;font-size:12px;color:#6b7280">Resampling changes fs. Annotations remain at old indices until reprojected.</p>
             <button id="btnReprojectAnno" class="btn" disabled>Reproject annotations to new fs</button>
+          </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid #18253d">
+            <p style="margin:0 0 6px;font-size:12px;color:#6b7280">Trim signal (keeps [start, end) &mdash; end exclusive, like a Python slice; blank start = beginning, blank end = end of signal). Annotations shift with the signal; those outside the kept range are dropped.</p>
+            <div class="row" style="margin-bottom:8px">
+              <label>Start</label>
+              <input id="trimStart" type="number" min="0" step="any" placeholder="0" style="width:110px" />
+              <label>End</label>
+              <input id="trimEnd" type="number" min="0" step="any" placeholder="(end)" style="width:110px" />
+              <select id="trimUnit" title="Units for start and end">
+                <option value="s" selected>seconds</option>
+                <option value="samples">samples</option>
+              </select>
+              <button id="btnTrimUseVisible" class="btn" title="Fill start and end from the currently visible (zoomed) window">Use visible window</button>
+            </div>
+            <div class="row">
+              <button id="btnTrim" class="btn accent" title="Trim all channels to [start, end)">✂ Trim</button>
+              <button id="btnTrimToVisible" class="btn accent" title="Trim all channels to exactly the currently visible (zoomed) window">✂ Trim to visible window</button>
+              <button id="btnUndoTrim" class="btn warn" disabled title="Restore the signal and annotations exactly as they were immediately before the last trim">↶ Undo trim</button>
+              <span id="trimStatus" class="badge" style="display:none"></span>
+            </div>
           </div>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid #18253d">
             <p style="margin:0 0 6px;font-size:12px;color:#6b7280">Filters (Butterworth, zero-phase):</p>
@@ -1039,7 +1077,7 @@ function openBibWindow(key) {
       scope: 'visible',
       replace: false,
       // Find-peaks params
-      fp: { polarity:'max', minDistMs:200, threshold:'', prominence:'', promWinMs:120 },
+      fp: { polarity:'max', minDistMs:200, threshold:'', height:'', prominence:'', promWinMs:120 },
       // Pan-Tompkins params (primarily for R peaks)
       pt: { lowHz:5, highHz:15, mwiMs:150, minRRMs:250, threshK:0.8, refineMs:120 },
       // R subtype assignment when writing R peaks
@@ -1570,6 +1608,7 @@ def unpack_session(b64_str, fmt):
       <div class="kv"><div class="k">Sampling Freq</div><div class="v">${state.fs} Hz</div></div>
       <div class="kv"><div class="k">Duration</div><div class="v">${state.nSamples && state.fs ? (state.nSamples/state.fs).toFixed(2)+' s' : '—'}</div></div>
       <div class="kv"><div class="k">Channels list</div><div class="v">${state.channelNames.join(', ')||'—'}</div></div>
+      ${state.trimOffsetSec ? `<div class="kv"><div class="k">Trimmed (start offset)</div><div class="v">${state.trimOffsetSec.toFixed(3)} s from loaded record</div></div>` : ''}
     `;
   }
   function populateChannelSelect(){
@@ -2294,7 +2333,7 @@ def unpack_session(b64_str, fmt):
 
     // Successive differences over ORIGINALLY ADJACENT valid pairs only, so that
     // intervals on opposite sides of an excluded interval are never treated as
-    // neighbours. Feeds RMSSD, NN50, pNN50 and the Poincare descriptors.
+    // neighbors. Feeds RMSSD, NN50, pNN50 and the Poincare descriptors.
     const dnn = successiveDifferences(nnAnalysisMs);
     const rmssd = dnn.length ? Math.sqrt(_mean(dnn.map(v=>v*v))) : NaN;
     const nn50 = dnn.filter(v=>Math.abs(v)>50).length;
@@ -3030,7 +3069,7 @@ if(btnRRRemove){
       return {ok:false, reason: 'Poincaré plot needs at least 3 valid NN intervals in the visible segment.'};
     }
     // Poincaré pairs must come from ORIGINALLY ADJACENT intervals: excluded
-    // intervals break the chain rather than joining their neighbours.
+    // intervals break the chain rather than joining their neighbors.
     const seq = Array.isArray(res.nnAnalysisSeries) ? res.nnAnalysisSeries : res.nnSeries;
     const xs=[], ys=[];
     for(let i=1;i<seq.length;i++){
@@ -3097,8 +3136,8 @@ if(btnRRRemove){
       + '<div>SampEn<b id="sEnt">—</b></div>'
       + '</div>'
       + '<canvas id="pc" width="480" height="480"></canvas>'
-      + '<div class="note">Each point is (RR<sub>n</sub>, RR<sub>n+1</sub>) in ms. The dashed grey line is the identity (RR<sub>n</sub>=RR<sub>n+1</sub>); '
-      + 'the ellipse is centred at the mean NN with semi-axes SD1 (transverse) and SD2 (longitudinal).</div>'
+      + '<div class="note">Each point is (RR<sub>n</sub>, RR<sub>n+1</sub>) in ms. The dashed gray line is the identity (RR<sub>n</sub>=RR<sub>n+1</sub>); '
+      + 'the ellipse is centered at the mean NN with semi-axes SD1 (transverse) and SD2 (longitudinal).</div>'
       + '</div>'
       + '<script>(function(){'
       + 'var D=' + JSON.stringify(payload) + ';'
@@ -3859,7 +3898,7 @@ if(btnRRRemove){
       + '</div>'
       + '<div class="note">Power spectral density (' + payload.units + '&sup2;/Hz, log scale) of the visible ECG segment for the active channel. '
       + 'Shaded regions mark the subbands used for the signal-quality ratios above: pSQI is relative power in the QRS band vs. the wider window; '
-      + 'basSQI penalises baseline-band power; lineSQI is relative power in the mains band.</div>'
+      + 'basSQI penalizes baseline-band power; lineSQI is relative power in the mains band.</div>'
       + '</div>'
       + '<script>(function(){'
       + 'var D=' + JSON.stringify(payload) + ';'
@@ -3979,6 +4018,7 @@ if(btnRRRemove){
       state.signals = data.signals.map(a=>Float64Array.from(a));
       state.origSignals = data.signals.map(a=>Float64Array.from(a));
       state.recordBase = recordBase;
+      _resetTrimTracking();
 
       // Initialize peak arrays
       state.peaks={R:{},P:{},Q:{},S:{},T:{},U:{}};
@@ -4086,6 +4126,32 @@ if(btnRRRemove){
     return traces;
   }
 
+  // ======== Hover boxes on the chart ========
+  // Two independent switches: "Hover coordinates" covers the ECG trace itself,
+  // "Annotation tooltips" covers everything drawn on top of it (R/P/Q/S/T/U
+  // markers and the whole RR-review overlay). Between them they account for
+  // every hover box on the chart.
+  //
+  // Both turn a tooltip off with 'none' rather than 'skip': 'skip' would also
+  // stop Plotly from emitting hover and click events for that trace, which
+  // would break click-to-annotate and clicking a flagged ring to open its
+  // review panel.
+  function hoverCoordsEnabled(){
+    const el = document.getElementById('chkHoverCoords');
+    return el ? !!el.checked : true;
+  }
+  function signalHoverInfo(){ return hoverCoordsEnabled() ? 'all' : 'none'; }
+
+  function annotTooltipsEnabled(){
+    const el = document.getElementById('chkAnnotTooltips');
+    return el ? !!el.checked : true;
+  }
+  // Peak markers: 'all' is Plotly's own default for these traces, so switching
+  // the box back on restores exactly the previous label (x, y, hovertext, name).
+  function peakHoverInfo(){ return annotTooltipsEnabled() ? 'all' : 'none'; }
+  // RR-review overlay traces have always been text-only.
+  function overlayHoverInfo(){ return annotTooltipsEnabled() ? 'text' : 'none'; }
+
   async function drawCurrentChannel(){
     const idx = parseInt(document.getElementById('selChannel').value||'0');
     currentChannel=idx;
@@ -4096,7 +4162,7 @@ if(btnRRRemove){
     const xData = Array.from({length: sig.length}, (_, i) => idxToDisplayX(i));
     const yData = Array.from(sig);
 
-    const traces = [{x:xData, y:yData, type:'scatter', mode:'lines', name:state.channelNames[idx]||`CH${idx}`, line:{color:'#3b82f6'}}];
+    const traces = [{x:xData, y:yData, type:'scatter', mode:'lines', name:state.channelNames[idx]||`CH${idx}`, line:{color:'#3b82f6'}, hoverinfo:signalHoverInfo()}];
     
     // Helper function to plot peaks with validation
     function addPeakTrace(peakType, color, name) {
@@ -4121,7 +4187,8 @@ if(btnRRRemove){
                 mode:'markers', 
                 name:`R-${beatType}`, 
                 marker:{color:getRBeatColor(beatType), size:8},
-                hovertext: validPeaks.map(p=>`R-peak [${beatType}] @ ${p}`)
+                hovertext: validPeaks.map(p=>`R-peak [${beatType}] @ ${p}`),
+                hoverinfo: peakHoverInfo()
               });
             }
           }
@@ -4153,7 +4220,8 @@ if(btnRRRemove){
               mode:'markers', 
               name:name, 
               marker:{color:color, size:8},
-              hovertext: validPeaks.map(p=>`${name} @ ${p}`)
+              hovertext: validPeaks.map(p=>`${name} @ ${p}`),
+              hoverinfo: peakHoverInfo()
             });
           }
         }
@@ -4249,6 +4317,9 @@ if(btnRRRemove){
   }
 
   function addPeak(type, channel, idx){
+    // Manual annotation edits share the undo/redo stacks with the bulk peak
+    // operations, so Ctrl+Z walks back through them one click at a time.
+    _pushPeakOpSnapshot(`Add ${type}-peak at sample ${idx}`);
     if(type === 'R'){
       // R-peaks use object structure with beat type
       if(!state.peaks[type][channel]) state.peaks[type][channel]=[];
@@ -4288,6 +4359,9 @@ if(btnRRRemove){
       }
     }
     if(bestType && bestIdx>=0 && bestDist<50){
+      const doomed = state.peaks[bestType][channel][bestIdx];
+      const doomedIdx = (bestType === 'R') ? doomed.index : doomed;
+      _pushPeakOpSnapshot(`Remove ${bestType}-peak at sample ${doomedIdx}`);
       const removed = state.peaks[bestType][channel].splice(bestIdx, 1)[0];
       const removedIdx = (bestType === 'R') ? removed.index : removed;
       if(bestType === 'R') invalidateRRCorrection('R-peak deleted');
@@ -4300,6 +4374,34 @@ if(btnRRRemove){
   async function updateAnnotationTraces(){ await drawCurrentChannel(); }
 
   document.getElementById('selChannel').addEventListener('change', drawCurrentChannel);
+  const chkHoverCoords = document.getElementById('chkHoverCoords');
+  if(chkHoverCoords){
+    chkHoverCoords.addEventListener('change', ()=>{
+      // Restyling trace 0 is enough, and avoids rebuilding the whole signal.
+      try{
+        if(plotDiv && plotDiv.data && plotDiv.data.length){
+          Plotly.restyle(plotDiv, {hoverinfo: signalHoverInfo()}, [0]);
+        }
+      }catch(e){
+        console.warn('Hover-coordinate restyle failed, falling back to redraw', e);
+        drawCurrentChannel();
+      }
+      log(`Signal hover coordinates ${hoverCoordsEnabled() ? 'enabled' : 'disabled'}`, 'info');
+    });
+  }
+
+  const chkAnnotTooltips = document.getElementById('chkAnnotTooltips');
+  if(chkAnnotTooltips){
+    chkAnnotTooltips.addEventListener('change', ()=>{
+      // A full redraw here rather than a restyle: the annotation traces are a
+      // variable-length set built per channel, and the peak markers and the
+      // RR-review overlay need different hoverinfo values, so there is no fixed
+      // trace index to target the way the signal trace has one.
+      drawCurrentChannel();
+      log(`Annotation tooltips ${annotTooltipsEnabled() ? 'enabled' : 'disabled'}`, 'info');
+    });
+  }
+
   document.getElementById('selXAxisUnit').addEventListener('change', (e)=>{
     state.xAxisUnit = e.target.value;
     // Any stored zoom range was captured in the previous unit's scale, so it no
@@ -4317,6 +4419,10 @@ if(btnRRRemove){
     const peak = arr.find(p=>p.index === index);
     if(peak){
       const oldType = peak.type;
+      // Only a real change is worth an undo step (and worth clearing redo).
+      if(oldType !== beatType){
+        _pushPeakOpSnapshot(`Classify R-peak at sample ${index} as [${beatType}]`);
+      }
       peak.type = beatType;
       updateBadges();
       drawCurrentChannel();
@@ -4396,8 +4502,16 @@ if(btnRRRemove){
   
   // Keyboard shortcuts for classification
   document.addEventListener('keydown', (e)=>{
-    // Only process if not in input field
-    if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    // Not while typing. A focused <select> is also skipped, because letters
+    // there drive its own option type-ahead; _isTextEntryTarget deliberately
+    // does not count checkboxes, radios, sliders or file pickers, so these keys
+    // keep working after a click on one of those.
+    if(_isTextEntryTarget(e.target)) return;
+    if(e.target && e.target.tagName === 'SELECT') return;
+    // Never read a browser/OS accelerator as a beat label: Ctrl+S, Ctrl+A,
+    // Ctrl+Z and friends must not classify a peak as a side effect. Shift is
+    // deliberately allowed, since Shift+R is the RBBB shortcut below.
+    if(e.ctrlKey || e.metaKey || e.altKey) return;
     
     const key = e.key.toUpperCase();
     const beatTypeMap = {
@@ -4452,8 +4566,353 @@ if(btnRRRemove){
     }
   });
 
+  // ======== Undo / redo for annotation edits and peak operations ========
+  // Covers the bulk peak operations (Detect & assign, Snap/Adjust, Clear peaks)
+  // and the manual annotation edits (add peak, remove nearest, remove last,
+  // classify R-peak), in one pair of stacks driven by the Undo/Redo buttons and
+  // by Ctrl+Z / Ctrl+Y.
+  //
+  // Multi-level (last PEAK_OP_UNDO_MAX changes). Each undo entry is a full
+  // snapshot of the annotations (all channels) plus the state that depends on
+  // them, taken immediately BEFORE the change; undoing restores that snapshot,
+  // so any edits made after the change are reverted with it. Undoing moves the
+  // state it replaces onto the redo stack; redoing moves it back. A new change
+  // clears the redo stack. If annotations were edited after an undo, redo asks
+  // before discarding those edits. Both stacks are cleared whenever the sample
+  // axis or the annotation set is replaced (new record, annotation import, trim,
+  // undo trim, reprojection).
+  //
+  // Because manual edits push one snapshot per click, the stacks are bounded by
+  // a step count AND by an approximate memory budget: long Holter records can
+  // hold tens of thousands of peaks, and 50 full copies of those would be a
+  // problem on their own. The budget counts the JSON length of the cloned
+  // objects, not their footprint once parsed, so it is deliberately well under
+  // the memory it is protecting. The oldest entries are dropped first, which
+  // means the undo depth is the full 50 steps on ordinary records and shallower
+  // on very large ones.
+  const PEAK_OP_UNDO_MAX = 50;
+  const PEAK_OP_UNDO_MAX_CHARS = 25e6;
+  state.peakOpHistory = [];   // undo stack
+  state.peakOpRedo = [];      // redo stack
+
+  function _updatePeakOpUI(){
+    const h = state.peakOpHistory || [];
+    const r = state.peakOpRedo || [];
+    const b = document.getElementById('btnUndoPeakOp');
+    if(b){
+      b.disabled = h.length === 0;
+      b.title = h.length
+        ? `Undo (Ctrl+Z): ${h[h.length-1].label}  (${h.length} step${h.length>1?'s':''} available). Restores all annotations to just before that change.`
+        : 'Nothing to undo (Ctrl+Z)';
+    }
+    const rb = document.getElementById('btnRedoPeakOp');
+    if(rb){
+      rb.disabled = r.length === 0;
+      rb.title = r.length
+        ? `Redo (Ctrl+Y): ${r[r.length-1].label}  (${r.length} step${r.length>1?'s':''} available).`
+        : 'Nothing to redo (Ctrl+Y)';
+    }
+  }
+
+  function _resetPeakOpHistory(reason){
+    const had = (state.peakOpHistory || []).length + (state.peakOpRedo || []).length;
+    state.peakOpHistory = [];
+    state.peakOpRedo = [];
+    _updatePeakOpUI();
+    if(had && reason) log(`Annotation undo/redo history cleared (${reason}).`, 'info');
+  }
+
+  // Captures the current annotation-related state (not pushed anywhere).
+  // The clone helper also accumulates the serialized size, so the memory budget
+  // costs no extra stringify pass.
+  function _capturePeakOpState(label){
+    let chars = 0;
+    const clone = (o)=>{
+      if(o === undefined || o === null) return o;
+      const s = JSON.stringify(o);
+      chars += s.length;
+      return JSON.parse(s);
+    };
+    const snap = {
+      label,
+      at: Date.now(),
+      nSamples: state.nSamples,
+      peaks: clone(state.peaks),
+      annotationHistory: clone(state.annotationHistory || []),
+      rrCases: clone(state.rrCases || []),
+      rrCorrection: clone(state.rrCorrection),
+      rrQcLast: clone(state.rrQcLast),
+      rrRepairHistoryLen: (state.rrRepairHistory || []).length,
+      lastAddedRPeak: lastAddedRPeak ? Object.assign({}, lastAddedRPeak) : null
+    };
+    snap.approxChars = chars;
+    return snap;
+  }
+
+  function _stackChars(stack){
+    let n = 0;
+    for(const e of (stack || [])) n += (e.approxChars || 0);
+    return n;
+  }
+
+  // Keeps the combined undo + redo snapshots under the character budget by
+  // dropping the oldest undo entries first, then the oldest redo entries. The
+  // newest entry of each stack is always kept, so undo/redo never goes dead.
+  function _trimPeakOpMemory(){
+    let guard = 0;
+    while(_stackChars(state.peakOpHistory) + _stackChars(state.peakOpRedo) > PEAK_OP_UNDO_MAX_CHARS && guard++ < 1000){
+      if((state.peakOpHistory || []).length > 1) state.peakOpHistory.shift();
+      else if((state.peakOpRedo || []).length > 1) state.peakOpRedo.shift();
+      else break;
+    }
+  }
+
+  function _pushCapped(stack, entry){
+    stack.push(entry);
+    while(stack.length > PEAK_OP_UNDO_MAX) stack.shift();
+    _trimPeakOpMemory();
+  }
+
+  // The redo stack cleared by the most recent push, held so that a change which
+  // turns out to be a no-op can hand it back. Every _discardLastPeakOpSnapshot()
+  // call site runs in the same synchronous step as its _pushPeakOpSnapshot().
+  let _supersededRedo = [];
+
+  // Records the state BEFORE a new change. A new change invalidates redo.
+  function _pushPeakOpSnapshot(label){
+    const snap = _capturePeakOpState(label);
+    if(!state.peakOpHistory) state.peakOpHistory = [];
+    _supersededRedo = state.peakOpRedo || [];
+    state.peakOpRedo = [];                 // cleared before the push, so the budget sees the real total
+    _pushCapped(state.peakOpHistory, snap);
+    _updatePeakOpUI();
+    return snap;
+  }
+
+  // Drops the most recent snapshot without restoring it (used when a change
+  // turned out to be a no-op), putting back the redo stack it had cleared.
+  function _discardLastPeakOpSnapshot(){
+    if(state.peakOpHistory && state.peakOpHistory.length) state.peakOpHistory.pop();
+    state.peakOpRedo = _supersededRedo || [];
+    _supersededRedo = [];
+    _trimPeakOpMemory();
+    _updatePeakOpUI();
+  }
+
+  // Writes a captured snapshot back into state and refreshes the UI.
+  async function _restorePeakOpState(snap){
+    state.peaks = snap.peaks;
+    state.annotationHistory = snap.annotationHistory || [];
+    state.rrCases = snap.rrCases || [];
+    state.rrCorrection = snap.rrCorrection || null;
+    state.rrQcLast = snap.rrQcLast || {maskBad:[], rrCleanMs:[], applied:false};
+    state.rrRepairPreview = null;
+    lastAddedRPeak = snap.lastAddedRPeak || null;
+    const lastInfo = document.getElementById('lastRPeakInfo');
+    if(lastInfo){
+      if(lastAddedRPeak){
+        // Report the restored beat label, so undoing a classification is visible here too.
+        const p = (state.peaks.R[lastAddedRPeak.channel] || []).find(q=> q.index === lastAddedRPeak.index);
+        lastInfo.textContent = `Last: R@${lastAddedRPeak.index}` + (p ? ` [${p.type || 'N'}]` : '');
+      } else {
+        lastInfo.textContent = '';
+      }
+    }
+    classifyTargetPeak = null;
+
+    _updatePeakOpUI();
+    updateBadges();
+    await drawCurrentChannel();
+    try{ renderRRReviewSummary(); }catch(_e){}
+    updateHRVDebounced();
+    updateSQIDebounced();
+    maybeEnableReproject();
+  }
+
+  async function undoLastPeakOp(){
+    const h = state.peakOpHistory || [];
+    const snap = h[h.length-1];
+    if(!snap){ log('Nothing to undo','warning'); return {ok:false}; }
+    if(snap.nSamples !== state.nSamples){
+      // Safety net: the sample axis changed without the stacks being cleared.
+      _resetPeakOpHistory('signal length changed');
+      log('Cannot undo: the signal length changed since that change.','error');
+      return {ok:false};
+    }
+    h.pop();
+
+    // Current state becomes the redo target for this operation.
+    const redoEntry = _capturePeakOpState(snap.label);
+    // RR repairs applied after this operation are reverted with it; keep their
+    // undo entries with the redo target so redo can put them back.
+    const rrh = Array.isArray(state.rrRepairHistory) ? state.rrRepairHistory : [];
+    redoEntry.rrRepairBaseLen = snap.rrRepairHistoryLen;
+    redoEntry.rrRepairTail = rrh.slice(snap.rrRepairHistoryLen);
+    if(rrh.length > snap.rrRepairHistoryLen){
+      state.rrRepairHistory = rrh.slice(0, snap.rrRepairHistoryLen);
+    }
+
+    await _restorePeakOpState(snap);
+    // Fingerprint of the restored annotations, so redo can tell whether they were edited since.
+    redoEntry.expectKey = JSON.stringify(state.peaks);
+    if(!state.peakOpRedo) state.peakOpRedo = [];
+    _pushCapped(state.peakOpRedo, redoEntry);
+    _updatePeakOpUI();
+
+    log(`Undid: ${snap.label}`, 'warning');
+    return {ok:true, label: snap.label};
+  }
+
+  async function redoLastPeakOp(){
+    const r = state.peakOpRedo || [];
+    const entry = r[r.length-1];
+    if(!entry){ log('Nothing to redo','warning'); return {ok:false}; }
+    if(entry.nSamples !== state.nSamples){
+      _resetPeakOpHistory('signal length changed');
+      log('Cannot redo: the signal length changed since that change was undone.','error');
+      return {ok:false};
+    }
+    if(entry.expectKey && JSON.stringify(state.peaks) !== entry.expectKey){
+      if(!confirm(`Annotations were edited after the undo.\n\nRedoing "${entry.label}" will discard those edits. Continue?`)){
+        return {ok:false, cancelled:true};
+      }
+    }
+    r.pop();
+
+    // The state being replaced goes back on the undo stack (without clearing redo).
+    const undoEntry = _capturePeakOpState(entry.label);
+    if(!state.peakOpHistory) state.peakOpHistory = [];
+    _pushCapped(state.peakOpHistory, undoEntry);
+
+    // Put back the RR repair undo entries that the undo set aside.
+    if(Array.isArray(entry.rrRepairTail) && Number.isFinite(entry.rrRepairBaseLen)){
+      const rrh = Array.isArray(state.rrRepairHistory) ? state.rrRepairHistory : [];
+      state.rrRepairHistory = rrh.slice(0, entry.rrRepairBaseLen).concat(entry.rrRepairTail);
+    }
+
+    await _restorePeakOpState(entry);
+    log(`Redid: ${entry.label}`, 'success');
+    return {ok:true, label: entry.label};
+  }
+
+  // Serializes undo/redo: both are async (they redraw), and holding Ctrl+Z or
+  // double-clicking the button would otherwise overlap two restores.
+  let _undoRedoBusy = false;
+  async function runUndoRedo(which){
+    if(_undoRedoBusy) return {ok:false, busy:true};
+    _undoRedoBusy = true;
+    try{
+      return (which === 'redo') ? await redoLastPeakOp() : await undoLastPeakOp();
+    }catch(e){
+      const what = (which === 'redo') ? 'Redo' : 'Undo';
+      console.error(what + ' failed', e);
+      setError(what + ' failed: ' + (e.message||String(e)));
+      return {ok:false};
+    }finally{
+      _undoRedoBusy = false;
+    }
+  }
+
+  const btnUndoPeakOp = document.getElementById('btnUndoPeakOp');
+  if(btnUndoPeakOp){
+    btnUndoPeakOp.addEventListener('click', ()=> runUndoRedo('undo'));
+  }
+  const btnRedoPeakOp = document.getElementById('btnRedoPeakOp');
+  if(btnRedoPeakOp){
+    btnRedoPeakOp.addEventListener('click', ()=> runUndoRedo('redo'));
+  }
+  _updatePeakOpUI();
+
+  // ======== Keyboard shortcuts: undo/redo and annotation mode ========
+  // Ctrl+Z (Cmd+Z on macOS) undoes, Ctrl+Y or Ctrl+Shift+Z redoes, using the
+  // same stacks as the buttons above. The number keys switch the Mode selector
+  // so the annotation type can be changed without leaving the plot.
+  const MODE_SHORTCUTS = {
+    '0': 'nav',
+    '1': 'addR',
+    '2': 'addP',
+    '3': 'addT',
+    '4': 'addU',
+    '5': 'addQ',
+    '6': 'addS',
+    '7': 'del'
+  };
+
+  // Only fields that actually take typed text should swallow a shortcut, so that
+  // typing keeps the browser's own behavior (including its undo stack). A
+  // checkbox, radio, slider or file picker takes no text, and focus lands on one
+  // of those as soon as the user clicks a checkbox such as "Hover coordinates" —
+  // treating those as text fields made the shortcuts die until the next click
+  // somewhere else.
+  const TEXT_ENTRY_INPUT_TYPES = ['text','number','search','tel','url','email','password',
+                                  'date','datetime-local','month','time','week'];
+  function _isTextEntryTarget(el){
+    if(!el) return false;
+    if(el.isContentEditable === true) return true;
+    if(el.tagName === 'TEXTAREA') return true;
+    if(el.tagName !== 'INPUT') return false;
+    return TEXT_ENTRY_INPUT_TYPES.indexOf(String(el.type || 'text').toLowerCase()) >= 0;
+  }
+
+  // Reads the digit off the physical key rather than off e.key, so a shortcut
+  // still works on a numeric keypad with Num Lock off (where e.key is 'End',
+  // 'ArrowDown', ...) and on layouts such as AZERTY where the top-row digits
+  // need Shift (where e.key is '&', 'é', ...). Falls back to e.key for events
+  // that carry no code.
+  function _shortcutDigit(e){
+    const m = /^(?:Digit|Numpad)([0-9])$/.exec(e.code || '');
+    if(m) return m[1];
+    return /^[0-9]$/.test(e.key || '') ? e.key : null;
+  }
+
+  document.addEventListener('keydown', (e)=>{
+    // Typing in a text field keeps the browser's own undo stack.
+    if(_isTextEntryTarget(e.target)) return;
+
+    const accel = e.ctrlKey || e.metaKey;
+    const key = (e.key || '').toLowerCase();
+
+    if(accel && !e.altKey && (key === 'z' || key === 'y')){
+      e.preventDefault();
+      const wantRedo = (key === 'y') || e.shiftKey;   // Ctrl+Y and Ctrl+Shift+Z both redo
+      runUndoRedo(wantRedo ? 'redo' : 'undo');
+      return;
+    }
+
+    // Mode shortcuts: never with Ctrl/Cmd/Alt, which are browser and OS
+    // accelerators (Ctrl+1 switches browser tabs). Shift IS allowed, because on
+    // some layouts it is the only way to reach a digit.
+    if(accel || e.altKey) return;
+    const digit = _shortcutDigit(e);
+    if(digit === null) return;
+    const mode = MODE_SHORTCUTS[digit];
+    if(!mode) return;
+    const sel = document.getElementById('selMode');
+    if(!sel) return;
+    // A focused <select> keeps its own digit type-ahead, with one exception: the
+    // Mode selector itself, which is what this shortcut drives. Picking a mode
+    // with the pointer leaves focus on it, so blocking that case made the keys
+    // look dead exactly when they were most wanted. Doing it the other way round
+    // for the rest matters because notchSel, mainsHz and lineWidthHz have
+    // options that start with a digit ('50 Hz', '60 Hz', '0.5 Hz'), where typing
+    // one is a useful native shortcut; every Mode option starts with a letter.
+    if(e.target && e.target.tagName === 'SELECT' && e.target !== sel) return;
+    e.preventDefault();
+    if(sel.value !== mode){
+      sel.value = mode;
+      // Mirror a manual change so every listener on the control still runs.
+      sel.dispatchEvent(new Event('change', {bubbles:true}));
+    }
+    const opt = sel.options[sel.selectedIndex];
+    const label = opt ? opt.textContent.replace(/\s*\[\d\]\s*$/, '').trim() : mode;
+    log(`Mode: ${label}`, 'info');
+  });
+
   document.getElementById('btnClearPeaks').addEventListener('click', ()=>{
     if(!confirm('Clear all R/P/Q/S/T/U peaks?')) return;
+    let nClear = 0;
+    for(const t of ['R','P','Q','S','T','U']) for(const ch in state.peaks[t]) nClear += (state.peaks[t][ch]||[]).length;
+    if(nClear) _pushPeakOpSnapshot(`Clear peaks (${nClear} peak${nClear>1?'s':''})`);
     for(const t of ['R','P','Q','S','T','U']){
       for(const ch in state.peaks[t]){ state.peaks[t][ch]=[]; }
     }
@@ -4468,8 +4927,13 @@ if(btnRRRemove){
       log('No annotations to remove','warning');
       return;
     }
+    const pending = state.annotationHistory[state.annotationHistory.length-1];
+    // Snapshot first so Ctrl+Z can put the annotation back; dropped again below
+    // if the entry turns out to be stale and nothing is actually removed.
+    _pushPeakOpSnapshot(`Remove last annotation (${pending.type}-peak at sample ${pending.index})`);
     const last = state.annotationHistory.pop();
     const arr = state.peaks[last.type][last.channel];
+    let removed = false;
     if(arr){
       let idx = -1;
       if(last.type === 'R'){
@@ -4481,6 +4945,8 @@ if(btnRRRemove){
       }
       if(idx !== -1){
         arr.splice(idx, 1);
+        removed = true;
+        if(last.type === 'R') invalidateRRCorrection('R-peak deleted');
         updateBadges();
         drawCurrentChannel();
         log(`Removed last annotation: ${last.type}-peak at sample ${last.index} (CH ${state.channelNames[last.channel]})`,'warning');
@@ -4488,6 +4954,7 @@ if(btnRRRemove){
         log('Last annotation not found (may have been cleared)','warning');
       }
     }
+    if(!removed) _discardLastPeakOpSnapshot();
   });
 
   // ======== Inversion ========
@@ -4505,6 +4972,7 @@ if(btnRRRemove){
   document.getElementById('btnSnapPeaks').addEventListener('click', ()=>{
     const win = parseInt(document.getElementById('snapWindow').value||'4');
     if(!(win>0)){ return setError('Enter a valid snap window'); }
+    _pushPeakOpSnapshot(`Snap peaks to local max (±${win} samples)`);
     let moved=0, total=0;
     // Only snap R, P, T, U peaks (not Q and S, which are often minima or inflection points)
     for(const t of ['R','P','T','U']){
@@ -4532,6 +5000,7 @@ if(btnRRRemove){
         }
       }
     }
+    if(moved === 0) _discardLastPeakOpSnapshot(); // nothing changed: no undo step
     updateAnnotationTraces();
     const snapStatus = document.getElementById('snapStatus');
     snapStatus.textContent=`✓ Adjusted ${moved}/${total} peaks (Q/S excluded)`;
@@ -4616,13 +5085,53 @@ if(btnRRRemove){
     return out;
   }
 
+  // Parse a find-peaks "height" specification, mirroring SciPy's find_peaks(height=...):
+  //   ''  / 'none'          -> no height limit
+  //   'a'                   -> height >= a
+  //   'a, b' (or 'a b',
+  //   '[a, b]', '(a; b)')   -> a <= height <= b  (first value is ALWAYS the minimum)
+  //   'none, b'  / ', b'    -> height <= b only
+  // Returns {ok:true, min, max, active} (min/max are null when unbounded) or {ok:false, msg}.
+  function _parseHeightSpec(spec){
+    if(spec === null || spec === undefined) return {ok:true, min:null, max:null, active:false};
+    if(typeof spec === 'number'){
+      return Number.isFinite(spec) ? {ok:true, min:spec, max:null, active:true}
+                                   : {ok:false, msg:'Height must be a finite number.'};
+    }
+    let s = String(spec).trim().replace(/^[\[\(]\s*/, '').replace(/\s*[\]\)]$/, '').trim();
+    if(s === '' || /^none$/i.test(s)) return {ok:true, min:null, max:null, active:false};
+    const parts = /[,;]/.test(s) ? s.split(/[,;]/) : s.split(/\s+/);
+    if(parts.length > 2){
+      return {ok:false, msg:'Height accepts at most two numbers: min or min, max.'};
+    }
+    const vals = [];
+    for(const raw of parts){
+      const t = raw.trim();
+      if(t === '' || /^(none|null)$/i.test(t)){ vals.push(null); continue; }
+      const x = Number(t);
+      if(!Number.isFinite(x)) return {ok:false, msg:`Height value "${t}" is not a number.`};
+      vals.push(x);
+    }
+    const min = (vals.length > 0) ? vals[0] : null;
+    const max = (vals.length > 1) ? vals[1] : null;
+    if(min !== null && max !== null && min > max){
+      return {ok:false, msg:`Height minimum (${min}) is greater than maximum (${max}).`};
+    }
+    return {ok:true, min, max, active:(min !== null || max !== null)};
+  }
+
   function _findPeaksCore(y, s0, s1, fs, opts){
-    // Basic local-extrema peak picker with optional threshold, prominence (approx), and min distance.
+    // Basic local-extrema peak picker with optional threshold, height (min[, max]), prominence (approx), and min distance.
     const polarity = opts.polarity || 'max';
     const minDist = Math.max(0, Math.floor((opts.minDistMs||0) * fs / 1000));
     const thr = _parseMaybeNumber(opts.threshold);
     const prom = _parseMaybeNumber(opts.prominence);
     const promWin = Math.max(1, Math.floor((opts.promWinMs||120) * fs / 1000));
+    // Height bounds (SciPy convention): compared against x for maxima, -x (depth) for minima, |x| for |x| maxima.
+    // Invalid specs are rejected by the caller; here an invalid spec is treated as "no height limit".
+    const hSpec = _parseHeightSpec(opts.height);
+    const hMin = (hSpec.ok && hSpec.min !== null) ? hSpec.min : null;
+    const hMax = (hSpec.ok && hSpec.max !== null) ? hSpec.max : null;
 
     const picks=[];
     let lastPick = -1e18;
@@ -4651,6 +5160,13 @@ if(btnRRRemove){
         } else {
           if(!(v >= thr)) continue;
         }
+      }
+
+      // height (min and/or max)
+      if(hMin !== null || hMax !== null){
+        const h = (polarity === 'min') ? -v : (polarity === 'abs') ? Math.abs(v) : v;
+        if(hMin !== null && !(h >= hMin)) continue;
+        if(hMax !== null && !(h <= hMax)) continue;
       }
 
       // approximate prominence
@@ -4819,11 +5335,13 @@ if(btnRRRemove){
     const pol=document.getElementById('fpPolarity');
     const md=document.getElementById('fpMinDistMs');
     const th=document.getElementById('fpThreshold');
+    const hg=document.getElementById('fpHeight');
     const pr=document.getElementById('fpProminence');
     const pw=document.getElementById('fpPromWinMs');
     if(pol) pol.value = fp.polarity || 'max';
     if(md) md.value = fp.minDistMs ?? 200;
     if(th) th.value = fp.threshold ?? '';
+    if(hg) hg.value = fp.height ?? '';
     if(pr) pr.value = fp.prominence ?? '';
     if(pw) pw.value = fp.promWinMs ?? 120;
 
@@ -4860,6 +5378,7 @@ if(btnRRRemove){
       polarity: (document.getElementById('fpPolarity')||{value:'max'}).value,
       minDistMs: Number((document.getElementById('fpMinDistMs')||{value:200}).value||200),
       threshold: (document.getElementById('fpThreshold')||{value:''}).value,
+      height: (document.getElementById('fpHeight')||{value:''}).value,
       prominence: (document.getElementById('fpProminence')||{value:''}).value,
       promWinMs: Number((document.getElementById('fpPromWinMs')||{value:120}).value||120)
     };
@@ -4924,6 +5443,16 @@ if(btnRRRemove){
       // persist UI to settings for that type
       state.detectorSettings[s.peakType] = {method:s.method, scope:s.scope, replace:s.replace, fp:s.fp, pt:s.pt, rSubtype:s.rSubtype};
 
+      // Validate the find-peaks height spec before running (blank, min, or min, max)
+      if(s.method === 'findpeaks'){
+        const hChk = _parseHeightSpec(s.fp.height);
+        if(!hChk.ok){
+          _showDetStatus('Height: ' + hChk.msg, 'error');
+          log('Detector: invalid height \u2014 ' + hChk.msg, 'error');
+          return;
+        }
+      }
+
       const sig = state.signals[currentChannel];
       const [s0,s1]=_getSegmentRangeByScope(s.scope);
       if(!(s1>=s0)) return;
@@ -4945,6 +5474,7 @@ if(btnRRRemove){
         return;
       }
 
+      _pushPeakOpSnapshot(`Detect & assign ${indices.length} → ${s.peakType} (${s.method}, ${s.scope}${s.replace?', replace':''}, CH ${state.channelNames[currentChannel]||currentChannel})`);
       _mergeDetectedPeaks(s.peakType, currentChannel, indices, s.replace, s0, s1, s.rSubtype);
 
       updateBadges();
@@ -5073,6 +5603,7 @@ if(btnRRRemove){
         channels: state.channelNames,
         units: state.units,
         nSamples: state.nSamples,
+        trimOffsetSec: state.trimOffsetSec || 0,
         peaks: state.peaks,
         exported_at: new Date().toISOString(),
         format: 'ecg-annotator-npz-v1'
@@ -5121,6 +5652,7 @@ if(btnRRRemove){
       state.signals = signals;
       state.origSignals = signals.map(a=>Float64Array.from(a));
       state.recordBase = meta.record || file.name.replace(/\.npz$/i,'');
+      _resetTrimTracking(meta.trimOffsetSec);
 
       // Peaks: tolerate missing or legacy formats
       const peaksSource = meta.peaks || meta.annotations || {R:{},P:{},Q:{},S:{},T:{},U:{}};
@@ -5266,16 +5798,17 @@ if(btnRRRemove){
   const SESSION_VALUE_CONTROLS = [
     'selChannel','selMode','snapWindow',
     'detPeakType','detRSubtype','detMethod','detScope',
-    'fpPolarity','fpMinDistMs','fpThreshold','fpProminence','fpPromWinMs',
+    'fpPolarity','fpMinDistMs','fpThreshold','fpHeight','fpProminence','fpPromWinMs',
     'ptLowHz','ptHighHz','ptMwiMs','ptMinRRMs','ptThreshK','ptRefineMs',
     'mainsHz','lineWidthHz',
     'rrQcMode','gpKernel','rrAbsMinMs','rrAbsMaxMs','rrMaxRelChange',
     'gpRQ_ell','gpRQ_alpha','gpRQ_sig2','gpM32_ell','gpM32_sig2',
     'gpM52_ell','gpM52_sig2','gpPer_per','gpPer_ell','gpPer_sig2','gpBrown_sig2',
-    'targetFs','hpCut','lpCut','notchSel','bpLow','bpHigh','wfdbRecName'
+    'targetFs','hpCut','lpCut','notchSel','bpLow','bpHigh','wfdbRecName',
+    'trimStart','trimEnd','trimUnit'
   ];
   // Control elements whose .checked is captured/restored.
-  const SESSION_CHECK_CONTROLS = ['detReplace','rrCompareLastAccepted'];
+  const SESSION_CHECK_CONTROLS = ['detReplace','rrCompareLastAccepted','chkHoverCoords','chkAnnotTooltips'];
   // Result/readout elements (textContent) captured for provenance/portability.
   const SESSION_RESULT_READOUTS = [
     'sqiPSQI','sqiKSQI','sqiBASSQI','sqiLINESQI',
@@ -5333,6 +5866,7 @@ if(btnRRRemove){
         channelNames: state.channelNames,
         units: state.units,
         recordBase: state.recordBase,
+        trimOffsetSec: state.trimOffsetSec || 0,
         signals: state.signals.map(a=> Array.from(a)),
         origSignals: (state.origSignals||[]).map(a=> Array.from(a))
       },
@@ -5461,6 +5995,7 @@ if(btnRRRemove){
         ? data.origSignals.map(a=> Float64Array.from(a))
         : signals.map(a=> Float64Array.from(a));
       state.recordBase = data.recordBase || (sourceName||'session').replace(/\.(json|mat|npz)$/i,'');
+      _resetTrimTracking(data.trimOffsetSec);
 
       // ---- Restore peaks / corrections (sanitize defensively) ----
       const peaks = session.peaks || {R:{},P:{},Q:{},S:{},T:{},U:{}};
@@ -5710,6 +6245,7 @@ if(btnRRRemove){
       await updateAnnotationTraces(); 
       let total=0; 
       for(const k of ['R','P','Q','S','T','U']) for(const ch in state.peaks[k]) total+=state.peaks[k][ch].length; 
+      _resetPeakOpHistory('annotations imported');
       importStatus.textContent=`✓ Loaded ${total} peaks`; 
       importStatus.style.display='inline-block'; 
       maybeEnableReproject();
@@ -5765,6 +6301,7 @@ if(btnRRRemove){
       await updateAnnotationTraces();
       let total = 0;
       for(const k of ['R','P','Q','S','T','U']) for(const ch in state.peaks[k]) total += state.peaks[k][ch].length;
+      _resetPeakOpHistory('WFDB annotations imported');
       wfdbAnnImportStatus.textContent = `✓ Loaded ${total} peaks from .${ext}`;
       wfdbAnnImportStatus.style.display = 'inline-block';
       log(`Imported WFDB annotations from ${f.name} (${total} peaks)`, 'success');
@@ -5885,6 +6422,7 @@ if(btnRRRemove){
         state.signals = imported.signals;
         state.origSignals = imported.signals.map(a=>Float64Array.from(a));
         state.recordBase = f.name.replace(/\.csv$/i, '');
+        _resetTrimTracking();
         
         // Reset peaks
         state.peaks={R:{},P:{},Q:{},S:{},T:{},U:{}};
@@ -6069,11 +6607,309 @@ if(btnRRRemove){
         }
       }
     }
+    _resetPeakOpHistory('annotations reprojected');
     await updateAnnotationTraces(); 
     const procBadge=document.getElementById('procBadge');
     if(procBadge) procBadge.textContent='Signal: modified (peaks aligned)';
     log(`Reprojected ${moved}/${total} annotations to new fs (×${factor.toFixed(6)})`,'success');
   });
+
+  // ======== Trim signal (keep samples [s0, e) on all channels) ========
+  // Trimming becomes the new baseline: the current signals AND the original
+  // (pre-processing) signals are trimmed to the same time span, so "Reset all
+  // signals" stays aligned with the shifted annotations. A single-level
+  // "Undo trim" restores the full state captured immediately before the trim.
+  state.trimOffsetSec = 0;   // cumulative start offset (s) relative to the loaded record
+  state.trimUndo = null;     // snapshot for one-level undo
+
+  function _updateTrimUI(){
+    const b = document.getElementById('btnUndoTrim');
+    if(b) b.disabled = !state.trimUndo;
+  }
+
+  // Called by every loader (WFDB, CSV, NPZ, session): a new record starts with
+  // no undo snapshot and the trim offset stored with it (0 when unknown).
+  function _resetTrimTracking(offsetSec){
+    state.trimOffsetSec = (Number.isFinite(Number(offsetSec)) && Number(offsetSec) > 0) ? Number(offsetSec) : 0;
+    state.trimUndo = null;
+    _updateTrimUI();
+    _resetPeakOpHistory(); // a newly loaded record also starts with an empty peak-operation undo stack
+  }
+
+  function _showTrimStatus(msg, kind){
+    const el = document.getElementById('trimStatus');
+    if(!el) return;
+    el.textContent = msg;
+    el.style.display = 'inline-block';
+    el.style.borderColor = kind==='error' ? '#ef4444' : (kind==='warning' ? '#eab308' : '#10b981');
+    setTimeout(()=>{ el.style.display='none'; }, 6000);
+  }
+
+  // Pure computation (no DOM, no state writes): returns the trimmed signals,
+  // original signals and peaks for the kept range [s0, e) at the current fs.
+  function _computeTrim(src, s0, e){
+    const fs = src.fs, origFs = (src.origFs && src.origFs > 0) ? src.origFs : src.fs;
+    const signals = src.signals.map(a => a.slice(s0, e));
+
+    // Map the kept time span onto the original-rate signals (identical when fs === origFs)
+    const ratio = origFs / fs;
+    const origSignals = (src.origSignals || []).map(a => {
+      const os0 = Math.max(0, Math.min(a.length, Math.round(s0 * ratio)));
+      const oe  = Math.max(os0, Math.min(a.length, Math.round(e * ratio)));
+      return a.slice(os0, oe);
+    });
+
+    let kept = 0, removed = 0;
+    const peaks = {R:{},P:{},Q:{},S:{},T:{},U:{}};
+    for(const k of ['R','P','Q','S','T','U']){
+      const byCh = (src.peaks && src.peaks[k]) ? src.peaks[k] : {};
+      for(const ch in byCh){
+        const arr = byCh[ch] || [];
+        if(k === 'R'){
+          const out = [];
+          for(const p of arr){
+            if(p && Number.isFinite(p.index) && p.index >= s0 && p.index < e){
+              const q = Object.assign({}, p, {index: p.index - s0});
+              if(Number.isFinite(q.movedFrom)) q.movedFrom = q.movedFrom - s0;
+              out.push(q);
+            } else { removed++; }
+          }
+          peaks.R[ch] = out; kept += out.length;
+        } else {
+          const out = [];
+          for(const v of arr){
+            if(Number.isFinite(v) && v >= s0 && v < e) out.push(v - s0);
+            else removed++;
+          }
+          peaks[k][ch] = out; kept += out.length;
+        }
+      }
+    }
+    return {signals, origSignals, peaks, nSamples: e - s0, offsetSec: s0 / fs, kept, removed};
+  }
+
+  // Reads the start/end boxes. Returns {ok, s0, e, clamped} (end exclusive) or {ok:false, msg}.
+  function _trimRangeFromInputs(){
+    if(!state.signals.length || !state.fs) return {ok:false, msg:'Load a signal first.'};
+    const unit = (document.getElementById('trimUnit')||{value:'s'}).value;
+    const sRaw = (document.getElementById('trimStart')||{value:''}).value.trim();
+    const eRaw = (document.getElementById('trimEnd')||{value:''}).value.trim();
+    const toSamples = (x)=> unit === 'samples' ? Math.round(x) : Math.round(x * state.fs);
+    let s0 = 0, e = state.nSamples, clamped = false;
+    if(sRaw !== ''){
+      const v = Number(sRaw);
+      if(!Number.isFinite(v)) return {ok:false, msg:'Start is not a number.'};
+      if(v < 0) return {ok:false, msg:'Start must be ≥ 0.'};
+      s0 = toSamples(v);
+    }
+    if(eRaw !== ''){
+      const v = Number(eRaw);
+      if(!Number.isFinite(v)) return {ok:false, msg:'End is not a number.'};
+      e = toSamples(v);
+    }
+    if(e > state.nSamples){ e = state.nSamples; clamped = true; }
+    if(s0 >= state.nSamples) return {ok:false, msg:'Start is beyond the end of the signal.'};
+    if(e - s0 < 2) return {ok:false, msg:'End must be after start (at least 2 samples kept).'};
+    return {ok:true, s0, e, clamped};
+  }
+
+  function _visibleTrimRange(){
+    const [x0, x1] = _getVisibleSampleRange();
+    return {s0: x0, e: Math.min(state.nSamples, x1 + 1)};
+  }
+
+  async function trimSignal(s0, e, sourceLabel){
+    if(!state.signals.length || !state.fs){ setError('Load a signal first'); return {ok:false}; }
+    s0 = Math.max(0, Math.floor(s0));
+    e  = Math.min(state.nSamples, Math.floor(e));
+    if(e - s0 < 2){ _showTrimStatus('✗ Range too short', 'error'); return {ok:false}; }
+    if(s0 === 0 && e === state.nSamples){
+      _showTrimStatus('Range covers the whole signal; nothing to trim.', 'warning');
+      return {ok:false};
+    }
+
+    const nKeep = e - s0;
+    const t0 = s0 / state.fs, t1 = e / state.fs;
+    const msg = `Trim all ${state.signals.length} channel(s) to samples [${s0}, ${e}) `
+      + `(${t0.toFixed(3)}–${t1.toFixed(3)} s, ${nKeep.toLocaleString()} samples)?\n\n`
+      + `Annotations outside this range will be removed and the rest will shift to the new start. `
+      + `RR review cases and the RR correction history will be cleared.\n\n`
+      + `"Undo trim" restores the state from immediately before this trim; changes made after trimming would be lost by undoing.`;
+    if(!confirm(msg)) return {ok:false};
+
+    const clone = (o)=> (o === undefined || o === null) ? o : JSON.parse(JSON.stringify(o));
+    // Snapshot for undo. Signal arrays are held by reference (the trim creates new
+    // arrays rather than mutating these, so no extra copy is needed).
+    const snapshot = {
+      signals: state.signals, origSignals: state.origSignals,
+      fs: state.fs, origFs: state.origFs, nSamples: state.nSamples,
+      peaks: clone(state.peaks),
+      annotationHistory: clone(state.annotationHistory || []),
+      zoomState: clone(state.zoomState),
+      trimOffsetSec: state.trimOffsetSec || 0,
+      rrCases: clone(state.rrCases || []),
+      rrCorrection: clone(state.rrCorrection),
+      rrQcLast: clone(state.rrQcLast),
+      rrRepairHistory: state.rrRepairHistory || [],
+      lastAddedRPeak: lastAddedRPeak ? Object.assign({}, lastAddedRPeak) : null,
+      procBadge: (document.getElementById('procBadge')||{}).textContent || ''
+    };
+
+    const r = _computeTrim({signals: state.signals, origSignals: state.origSignals,
+                            fs: state.fs, origFs: state.origFs, peaks: state.peaks}, s0, e);
+
+    state.signals = r.signals;
+    state.origSignals = r.origSignals;
+    state.nSamples = r.nSamples;
+    state.peaks = r.peaks;
+    state.trimOffsetSec = (state.trimOffsetSec || 0) + r.offsetSec;
+
+    // Index-based histories and RR review state refer to the old sample axis
+    state.annotationHistory = [];
+    state.rrRepairHistory = [];
+    state.rrCases = [];
+    state.rrRepairPreview = null;
+    invalidateRRCorrection('signal trimmed');
+    state.rrQcLast = {maskBad:[], rrCleanMs:[], applied:false};
+    if(lastAddedRPeak){
+      const li = lastAddedRPeak.index - s0;
+      lastAddedRPeak = (li >= 0 && li < r.nSamples) ? {channel: lastAddedRPeak.channel, index: li} : null;
+    }
+    const lastInfo = document.getElementById('lastRPeakInfo');
+    if(lastInfo) lastInfo.textContent = lastAddedRPeak ? `Last: R@${lastAddedRPeak.index}` : '';
+    classifyTargetPeak = null;
+    state.zoomState = null;
+    state.trimUndo = snapshot;
+    _resetPeakOpHistory('signal trimmed');
+
+    const ts = document.getElementById('trimStart'); if(ts) ts.value = '';
+    const te = document.getElementById('trimEnd');   if(te) te.value = '';
+
+    populateMeta();
+    updateBadges();
+    await drawCurrentChannel();
+    maybeEnableReproject();
+    try{ renderRRReviewSummary(); }catch(_e){}
+    _setRRQcText('rrFlaggedCount', '—');
+    _setRRQcText('rrCorrectionInfo', '—');
+    _updateTrimUI();
+    const procBadge=document.getElementById('procBadge');
+    if(procBadge) procBadge.textContent='Signal: trimmed';
+
+    const how = sourceLabel ? ` (${sourceLabel})` : '';
+    _showTrimStatus(`✓ Trimmed to ${nKeep.toLocaleString()} samples; ${r.removed} annotation(s) dropped`, r.removed ? 'warning' : 'success');
+    log(`Trimmed signal${how} to samples [${s0}, ${e}) = ${t0.toFixed(3)}–${t1.toFixed(3)} s `
+      + `(${nKeep.toLocaleString()} samples). Kept ${r.kept} annotation(s), dropped ${r.removed}. `
+      + `Cumulative offset from loaded record: ${state.trimOffsetSec.toFixed(3)} s.`, 'success');
+    return {ok:true, kept:r.kept, removed:r.removed};
+  }
+
+  async function undoTrim(){
+    const snap = state.trimUndo;
+    if(!snap){ _showTrimStatus('Nothing to undo.', 'warning'); return {ok:false}; }
+    if(!confirm('Undo the last trim?\n\nThe signal and annotations will be restored exactly as they were immediately before trimming. Any changes made since the trim (annotations, filtering, resampling, RR review) will be lost.')) return {ok:false};
+
+    state.signals = snap.signals;
+    state.origSignals = snap.origSignals;
+    state.fs = snap.fs;
+    state.origFs = snap.origFs;
+    state.nSamples = snap.nSamples;
+    state.peaks = snap.peaks;
+    state.annotationHistory = snap.annotationHistory || [];
+    state.zoomState = snap.zoomState || null;
+    state.trimOffsetSec = snap.trimOffsetSec || 0;
+    state.rrCases = snap.rrCases || [];
+    state.rrCorrection = snap.rrCorrection || null;
+    state.rrQcLast = snap.rrQcLast || {maskBad:[], rrCleanMs:[], applied:false};
+    state.rrRepairHistory = snap.rrRepairHistory || [];
+    state.rrRepairPreview = null;
+    lastAddedRPeak = snap.lastAddedRPeak || null;
+    const lastInfo = document.getElementById('lastRPeakInfo');
+    if(lastInfo) lastInfo.textContent = lastAddedRPeak ? `Last: R@${lastAddedRPeak.index}` : '';
+    classifyTargetPeak = null;
+    state.trimUndo = null;
+    _resetPeakOpHistory('trim undone');
+
+    populateMeta();
+    updateBadges();
+    await drawCurrentChannel();
+    maybeEnableReproject();
+    try{ renderRRReviewSummary(); }catch(_e){}
+    _updateTrimUI();
+    const procBadge=document.getElementById('procBadge');
+    if(procBadge) procBadge.textContent = snap.procBadge || 'Signal: original';
+
+    _showTrimStatus('✓ Trim undone', 'success');
+    log(`Undid trim: restored ${state.nSamples.toLocaleString()} samples @ ${state.fs} Hz.`, 'warning');
+    return {ok:true};
+  }
+
+  // ---- Trim UI wiring ----
+  (function initTrimUI(){
+    const unitEl = document.getElementById('trimUnit');
+    if(unitEl){
+      unitEl.dataset.prev = unitEl.value;
+      // Convert any values already typed when the unit changes
+      unitEl.addEventListener('change', ()=>{
+        const prev = unitEl.dataset.prev || 's', next = unitEl.value;
+        if(prev !== next && state.fs){
+          for(const id of ['trimStart','trimEnd']){
+            const el = document.getElementById(id);
+            if(!el || el.value.trim() === '') continue;
+            const v = Number(el.value);
+            if(!Number.isFinite(v)) continue;
+            el.value = (next === 'samples') ? String(Math.round(v * state.fs))
+                                            : String(Math.round(v / state.fs * 1e6) / 1e6);
+          }
+        }
+        unitEl.dataset.prev = next;
+      });
+    }
+
+    const btnUse = document.getElementById('btnTrimUseVisible');
+    if(btnUse){
+      btnUse.addEventListener('click', ()=>{
+        if(!state.signals.length || !state.fs) return setError('Load a signal first');
+        const {s0, e} = _visibleTrimRange();
+        const unit = (unitEl||{value:'s'}).value;
+        const ts = document.getElementById('trimStart'), te = document.getElementById('trimEnd');
+        if(unit === 'samples'){ ts.value = String(s0); te.value = String(e); }
+        else { ts.value = String(Math.round(s0/state.fs*1e6)/1e6); te.value = String(Math.round(e/state.fs*1e6)/1e6); }
+      });
+    }
+
+    const btnTrim = document.getElementById('btnTrim');
+    if(btnTrim){
+      btnTrim.addEventListener('click', async()=>{
+        try{
+          const rg = _trimRangeFromInputs();
+          if(!rg.ok){ _showTrimStatus('✗ ' + rg.msg, 'error'); return; }
+          if(rg.clamped) log('Trim end exceeds the signal length; clamped to the end of the signal.', 'warning');
+          await trimSignal(rg.s0, rg.e, 'start/end');
+        }catch(e){ console.error('Trim failed', e); setError('Trim failed: ' + (e.message||String(e))); }
+      });
+    }
+
+    const btnVis = document.getElementById('btnTrimToVisible');
+    if(btnVis){
+      btnVis.addEventListener('click', async()=>{
+        try{
+          if(!state.signals.length || !state.fs) return setError('Load a signal first');
+          const {s0, e} = _visibleTrimRange();
+          await trimSignal(s0, e, 'visible window');
+        }catch(e){ console.error('Trim failed', e); setError('Trim failed: ' + (e.message||String(e))); }
+      });
+    }
+
+    const btnUndo = document.getElementById('btnUndoTrim');
+    if(btnUndo){
+      btnUndo.addEventListener('click', async()=>{
+        try{ await undoTrim(); }
+        catch(e){ console.error('Undo trim failed', e); setError('Undo trim failed: ' + (e.message||String(e))); }
+      });
+    }
+    _updateTrimUI();
+  })();
 
   async function runFiltering({lp, hp, notch}){
     await pyodide.runPythonAsync(PY_SIGPROC);
@@ -6133,7 +6969,7 @@ if(btnRRRemove){
     snapMinConf:  0.35,   // minimum QRS confidence required to snap
     previewFirst: true,
     gpInput:      'time', // 'time' (preserved default) | 'index'
-    gpCenter:     true    // centre y on the training mean before GP regression
+    gpCenter:     true    // center y on the training mean before GP regression
   };
   state.rrReviewCfg = Object.assign({}, RR_REVIEW_DEFAULTS);
 
@@ -6144,7 +6980,7 @@ if(btnRRRemove){
     return 'r-' + state.peakIdSeq;
   }
 
-  // ---------- peak metadata normalisation ----------
+  // ---------- peak metadata normalization ----------
   // Gives every R-peak object a stable id + provenance fields, and repairs the
   // legacy `subtype` key that older auto-insertion code wrote instead of `type`.
   function ensureRPeakMeta(channel){
@@ -6270,7 +7106,7 @@ if(btnRRRemove){
     const y   = yTrainMs.map(v=> Number(v)/1000.0);   // seconds (preserved unit)
 
     // Zero-mean GPs with the study's very small signal variances collapse the
-    // posterior toward 0 s. Centring on the training mean is the documented
+    // posterior toward 0 s. Centering on the training mean is the documented
     // fix for that implementation mismatch; kernel parameters are unchanged.
     let mu = 0;
     if(o.centre){
@@ -6717,7 +7553,7 @@ if(btnRRRemove){
     target = snap.index;
 
     if(!(target > left.index && target < right.index))
-      return {ok:false, msg:'Proposed position would cross a neighbouring R-peak.'};
+      return {ok:false, msg:'Proposed position would cross a neighboring R-peak.'};
 
     c.proposedIntervalsMs = [
       (target - left.index)/state.fs*1000,
@@ -6792,7 +7628,7 @@ if(btnRRRemove){
       const snap = _rrSnap(ctx.channel, raw, c.snapToECG);
       const idx = snap.index;
       if(!(idx > prev && idx < right.index))
-        return {ok:false, msg:'A proposed R-peak would cross a neighbouring peak.'};
+        return {ok:false, msg:'A proposed R-peak would cross a neighboring peak.'};
       adds.push({
         action:'add',
         peak:{ id: createPeakId(), index: idx, type:'N',
@@ -7034,7 +7870,7 @@ if(btnRRRemove){
      §12  HRV INPUT SERIES
      Returns an RR series that PRESERVES SEQUENCE POSITION: excluded intervals
      become NaN instead of being removed, so successive-difference metrics can
-     never treat non-adjacent intervals as neighbours.
+     never treat non-adjacent intervals as neighbors.
      ========================================================================== */
   function buildRRAnalysisSeries(nnRawMs, maskBad){
     const out = nnRawMs.slice();
@@ -7149,7 +7985,7 @@ if(btnRRRemove){
         ht.push(`Synthetic R @ ${p.index}<br>source: ${p.source}<br>QRS confirmed: no`); }
       if(xs.length) traces.push({x:idxArrToDisplayX(xs), y:ys, type:'scatter', mode:'markers', name:'R (synthetic)',
         marker:{symbol:'x-thin-open', size:14, color:'#0ea5e9', line:{width:2.5, color:'#0ea5e9'}},
-        hovertext:ht, hoverinfo:'text', showlegend:false});
+        hovertext:ht, hoverinfo:overlayHoverInfo(), showlegend:false});
     }
 
     // --- rings + interval segments, grouped by status color
@@ -7183,12 +8019,12 @@ if(btnRRRemove){
     for(const [key, pts] of Object.entries(segX)){
       traces.push({x:idxArrToDisplayX(pts), y:segY[key], type:'scatter', mode:'lines', name:'RR '+RR_RING[key].label,
         line:{color:RR_RING[key].c, width:3, dash:'solid'}, opacity:0.75,
-        hovertext:segHT[key], hoverinfo:'text', showlegend:false});
+        hovertext:segHT[key], hoverinfo:overlayHoverInfo(), showlegend:false});
     }
     for(const [key, g] of Object.entries(byKey)){
       traces.push({x:idxArrToDisplayX(g.x), y:g.y, type:'scatter', mode:'markers', name:'RR '+RR_RING[key].label,
         marker:{symbol:'circle-open', size:18, color:RR_RING[key].c, line:{width:3, color:RR_RING[key].c}},
-        hovertext:g.ht, hoverinfo:'text', customdata:g.ids, showlegend:false});
+        hovertext:g.ht, hoverinfo:overlayHoverInfo(), customdata:g.ids, showlegend:false});
     }
 
     // --- uncommitted preview overlay (does NOT touch the annotation list)
@@ -7201,13 +8037,13 @@ if(btnRRRemove){
         px.push(m.proposedIndex); py.push(y); pht.push(`PREVIEW \u2013 move R ${m.oldIndex} \u2192 ${m.proposedIndex}`); }
       if(px.length) traces.push({x:idxArrToDisplayX(px), y:py, type:'scatter', mode:'markers', name:'RR preview',
         marker:{symbol:'diamond-open', size:16, color:RR_RING.preview.c, line:{width:3, color:RR_RING.preview.c}},
-        hovertext:pht, hoverinfo:'text', showlegend:false});
+        hovertext:pht, hoverinfo:overlayHoverInfo(), showlegend:false});
       const dx=[], dy=[], dht=[];
       for(const d of (pv.deletedPeaks||[])){ const y=at(d.oldIndex); if(y===null) continue;
         dx.push(d.oldIndex); dy.push(y); dht.push(`PREVIEW \u2013 delete R @ ${d.oldIndex}`); }
       if(dx.length) traces.push({x:idxArrToDisplayX(dx), y:dy, type:'scatter', mode:'markers', name:'RR preview delete',
         marker:{symbol:'x-open', size:18, color:'#ef4444', line:{width:3, color:'#ef4444'}},
-        hovertext:dht, hoverinfo:'text', showlegend:false});
+        hovertext:dht, hoverinfo:overlayHoverInfo(), showlegend:false});
     }
     return traces;
   }
@@ -7517,7 +8353,7 @@ if(btnRRRemove){
             </select></div>
           <div style="display:flex;align-items:flex-end">
             <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)">
-              <input id="rrCfgGpCentre" type="checkbox" checked> Centre GP on training mean</label></div>
+              <input id="rrCfgGpCentre" type="checkbox" checked> Center GP on training mean</label></div>
           <div style="display:flex;align-items:flex-end">
             <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)">
               <input id="rrCfgSnapDefault" type="checkbox" checked> Snap to QRS by default</label></div>
@@ -7601,7 +8437,7 @@ if(btnRRRemove){
       gpConvention: {
         rrUnitsForGP: 'seconds (rr_ms / 1000)',
         inputAxis: state.rrReviewCfg.gpInput === 'index' ? 'RR ordinal interval index' : 'elapsed time in seconds at the second R-peak',
-        meanFunction: state.rrReviewCfg.gpCenter ? 'constant, set to the training mean (centred)' : 'zero mean',
+        meanFunction: state.rrReviewCfg.gpCenter ? 'constant, set to the training mean (centered)' : 'zero mean',
         kernelDefaultsPreserved: true
       },
       cases: (state.rrCases||[]).map(c=> JSON.parse(JSON.stringify(c))),
@@ -7994,6 +8830,1071 @@ if(btnRRRemove){
     });
   }
 
+  // ======== Clinical ECG export (print-calibrated ECG paper, PDF-via-print) ========
+  // Renders the signal the way it appears on clinical ECG paper, so a reader can
+  // measure intervals and amplitudes directly off the printout with calipers or a
+  // ruler. Everything here is additive: no existing function, state field, library
+  // import or version pin is touched, and the live chart is never redrawn.
+  //
+  // Calibration contract
+  //   The page is emitted as an SVG whose width/height are given in millimeters and
+  //   whose viewBox is 1 user unit = 1 mm. The print stylesheet pins @page to the
+  //   same physical size with zero margin, so one millimeter in the drawing is one
+  //   millimeter on paper -- provided the browser's print dialog is left at 100%
+  //   scale (not "Fit to page"). The print bar states this.
+  //
+  //   Horizontal: paper speed, mm/s   (25 mm/s standard => 1 mm = 40 ms, 5 mm = 200 ms)
+  //   Vertical:   gain, mm/mV         (10 mm/mV standard => 1 mm = 0.1 mV, 10 mm = 1 mV)
+  //   Grid:       1 mm minor, 5 mm major, as on real ECG paper.
+
+  const ECGX_LEADS_12 = ['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
+
+  // Standard clinical cell orders.
+  const ECGX_GRID_3x4 = [
+    ['I','aVR','V1','V4'],
+    ['II','aVL','V2','V5'],
+    ['III','aVF','V3','V6']
+  ];
+  const ECGX_GRID_6x2 = [
+    ['I','V1'], ['II','V2'], ['III','V3'],
+    ['aVR','V4'], ['aVL','V5'], ['aVF','V6']
+  ];
+
+  const ECGX_PAGE_SIZES = {
+    a4_landscape:     {w:297,   h:210,   label:'A4 landscape (297 x 210 mm)'},
+    a4_portrait:      {w:210,   h:297,   label:'A4 portrait (210 x 297 mm)'},
+    letter_landscape: {w:279.4, h:215.9, label:'Letter landscape (11 x 8.5 in)'},
+    letter_portrait:  {w:215.9, h:279.4, label:'Letter portrait (8.5 x 11 in)'}
+  };
+
+  // Grid color pairs: [minor, major]. "Red" matches conventional thermal ECG paper.
+  const ECGX_GRID_COLORS = {
+    red:  ['#f6b8b8', '#e07a7a'],
+    gray: ['#d4d4d4', '#9e9e9e'],
+    none: [null, null]
+  };
+
+  const ECGX_MM_PER_SEC_CHOICES = [12.5, 25, 50];
+  const ECGX_MM_PER_MV_CHOICES  = [2.5, 5, 10, 20];
+
+  // Normalizes a WFDB signal name to a canonical 12-lead label where possible.
+  // Handles the common variants seen across PhysioNet databases: "MLII" (MIT-BIH),
+  // "ECG1"/"ECG I", "Lead II", "AVR", "v5", "II_", and so on. Returns the
+  // canonical label ('I', 'aVR', 'V3', ...) or null when the name is not a
+  // recognizable standard lead.
+  function _ecgxNormLeadName(name){
+    let s = String(name == null ? '' : name);
+    s = s.replace(/[\s_\-.()\[\]]/g, '');
+    if(!s) return null;
+    let up = s.toUpperCase();
+    // Strip common prefixes that carry no lead information.
+    up = up.replace(/^(ECG|EKG|LEAD|SIG|CH|CHANNEL)/, '');
+    // MIT-BIH modified limb leads: MLI / MLII / MLIII map to I / II / III.
+    const ml = up.match(/^ML(I{1,3})$/);
+    if(ml) return {I:'I', II:'II', III:'III'}[ml[1]] || null;
+    // Precordial leads, with or without a leading 'M'.
+    const v = up.match(/^M?V([1-6])$/);
+    if(v) return 'V' + v[1];
+    // Augmented limb leads.
+    const a = up.match(/^A?V([RLF])$/);
+    if(a) return 'aV' + a[1];
+    // Bipolar limb leads.
+    if(/^I{1,3}$/.test(up)) return {I:'I', II:'II', III:'III'}[up] || null;
+    if(up === '1') return 'I';
+    if(up === '2') return 'II';
+    if(up === '3') return 'III';
+    return null;
+  }
+
+  // Maps canonical lead label -> channel index for the loaded record.
+  // First match wins, so a record carrying a duplicate lead name keeps its
+  // earliest channel.
+  function _ecgxLeadMap(channelNames){
+    const map = {};
+    const names = channelNames || [];
+    for(let i = 0; i < names.length; i++){
+      const lead = _ecgxNormLeadName(names[i]);
+      if(lead && map[lead] == null) map[lead] = i;
+    }
+    return map;
+  }
+
+  // True when all twelve standard leads are present in the record.
+  function _ecgxHas12Lead(channelNames){
+    const map = _ecgxLeadMap(channelNames);
+    return ECGX_LEADS_12.every(l => map[l] != null);
+  }
+
+  // Converts the stored channel unit into millivolts, so the mm/mV gain means
+  // what it says. Unrecognized units are passed through with factor 1 and
+  // flagged, in which case the gain is "mm per unit" and the footer says so.
+  function _ecgxUnitToMv(unit){
+    const u = String(unit == null ? '' : unit).trim().toLowerCase();
+    if(u === 'mv' || u === '') return {factor:1, known:true, label:'mV'};
+    if(u === 'v')  return {factor:1000, known:true, label:'mV'};
+    if(u === 'uv' || u === 'µv' || u === 'μv') return {factor:0.001, known:true, label:'mV'};
+    if(u === 'nv') return {factor:1e-6, known:true, label:'mV'};
+    return {factor:1, known:false, label:String(unit)};
+  }
+
+  function _ecgxEsc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function _ecgxFmt(x, digits){
+    if(x === null || x === undefined || !isFinite(x)) return '—';
+    return Number(x).toFixed(digits == null ? 0 : digits);
+  }
+
+  // Median of a sample window, used as the per-cell baseline so a DC offset or
+  // slow wander does not push the trace out of its row. Robust to QRS spikes in
+  // a way a mean is not. Sub-sampled on long windows to keep the sort cheap.
+  function _ecgxBaseline(sig, i0, i1){
+    const n = i1 - i0;
+    if(n <= 0) return 0;
+    const stride = Math.max(1, Math.floor(n / 4000));
+    const vals = [];
+    for(let i = i0; i < i1; i += stride){
+      const v = sig[i];
+      if(isFinite(v)) vals.push(v);
+    }
+    if(!vals.length) return 0;
+    vals.sort((a, b) => a - b);
+    const m = vals.length >> 1;
+    return vals.length % 2 ? vals[m] : (vals[m - 1] + vals[m]) / 2;
+  }
+
+  // Builds the SVG path for one trace segment, in millimeter user units.
+  //
+  // Uses min/max decimation: the segment is divided into bins roughly one
+  // printer pixel wide and each bin contributes a vertical stroke from its
+  // minimum to its maximum sample. That keeps narrow QRS spikes at full height
+  // instead of letting point-skipping swallow them, while keeping the path small
+  // enough for a browser to print a multi-page record. When a bin would hold
+  // fewer than ~2.5 samples (slow paper speed is not the issue -- a low sampling
+  // rate or a fast speed is) every sample is emitted instead.
+  function _ecgxTracePath(sig, i0, i1, fs, xOriginMm, mmPerSec, yBaseMm, baseline, mmPerUnit, clampMm){
+    const n = i1 - i0;
+    if(n < 1 || !fs) return '';
+    const widthMm = (n / fs) * mmPerSec;
+    if(!(widthMm > 0)) return '';
+
+    const yOf = (v) => {
+      let y = yBaseMm - (v - baseline) * mmPerUnit;
+      const lo = yBaseMm - clampMm, hi = yBaseMm + clampMm;
+      if(y < lo) y = lo;
+      if(y > hi) y = hi;
+      return y;
+    };
+    const xOf = (i) => xOriginMm + ((i - i0) / fs) * mmPerSec;
+
+    const BIN_MM = 0.08;                                  // ~1 px at 300 dpi
+    const nBins = Math.max(1, Math.floor(widthMm / BIN_MM));
+    const samplesPerBin = n / nBins;
+    const out = [];
+
+    if(samplesPerBin < 2.5){
+      for(let i = i0; i < i1; i++){
+        const v = sig[i];
+        if(!isFinite(v)) continue;
+        out.push((out.length ? 'L' : 'M') + xOf(i).toFixed(2) + ' ' + yOf(v).toFixed(2));
+      }
+      return out.join('');
+    }
+
+    for(let b = 0; b < nBins; b++){
+      const a = i0 + Math.floor(b * samplesPerBin);
+      const z = Math.min(i1, i0 + Math.floor((b + 1) * samplesPerBin));
+      if(z <= a) continue;
+      let mn = Infinity, mx = -Infinity, iMn = a, iMx = a, any = false;
+      for(let i = a; i < z; i++){
+        const v = sig[i];
+        if(!isFinite(v)) continue;
+        any = true;
+        if(v < mn){ mn = v; iMn = i; }
+        if(v > mx){ mx = v; iMx = i; }
+      }
+      if(!any) continue;
+      // Draw the two extremes in the order they occur, so the stroke keeps the
+      // real slope direction through the bin.
+      const first  = (iMn <= iMx) ? mn : mx;
+      const second = (iMn <= iMx) ? mx : mn;
+      const x = ((xOf(a) + xOf(z)) / 2).toFixed(2);
+      out.push((out.length ? 'L' : 'M') + x + ' ' + yOf(first).toFixed(2));
+      if(second !== first) out.push('L' + x + ' ' + yOf(second).toFixed(2));
+    }
+    return out.join('');
+  }
+
+  // One combined path for every grid line at a given pitch. Emitted as a single
+  // <path> rather than hundreds of <line> elements to keep the document light.
+  // Lines are laid out from the plot origin so the 5 mm majors land on exact
+  // multiples of 5 mm from the trace start -- that is what makes the paper
+  // readable at a glance (200 ms and 0.5 mV per major square at standard settings).
+  function _ecgxGridPath(x0, y0, w, h, step){
+    const d = [];
+    const nV = Math.floor(w / step + 1e-6);
+    const nH = Math.floor(h / step + 1e-6);
+    for(let k = 0; k <= nV; k++){
+      const x = (x0 + k * step).toFixed(2);
+      d.push('M' + x + ' ' + y0.toFixed(2) + 'V' + (y0 + h).toFixed(2));
+    }
+    for(let k = 0; k <= nH; k++){
+      const y = (y0 + k * step).toFixed(2);
+      d.push('M' + x0.toFixed(2) + ' ' + y + 'H' + (x0 + w).toFixed(2));
+    }
+    return d.join('');
+  }
+
+  // The 1 mV / 200 ms calibration pulse printed at the start of a row. Its
+  // height is the gain and its width is 200 ms at the current paper speed, so a
+  // reader can confirm the scale of the strip from the strip itself.
+  function _ecgxCalPulse(xMm, yBaseMm, mmPerSec, mmPerMvEffective){
+    const w = 0.2 * mmPerSec;
+    const lead = Math.min(2, w * 0.25);
+    const x1 = xMm + lead, x2 = x1 + w;
+    const top = yBaseMm - mmPerMvEffective;
+    return 'M' + xMm.toFixed(2) + ' ' + yBaseMm.toFixed(2)
+         + 'H' + x1.toFixed(2)
+         + 'V' + top.toFixed(2)
+         + 'H' + x2.toFixed(2)
+         + 'V' + yBaseMm.toFixed(2)
+         + 'H' + (x2 + lead).toFixed(2);
+  }
+
+  function _ecgxCalPulseWidth(mmPerSec){
+    const w = 0.2 * mmPerSec;
+    return w + 2 * Math.min(2, w * 0.25);
+  }
+
+  // Annotation markers for one cell, drawn only when the user asks for them.
+  // Deliberately small ticks with a letter above, so an overlaid annotation can
+  // be checked against the waveform without obscuring the signal the way the
+  // on-screen markers would.
+  function _ecgxAnnotationMarks(ch, i0, i1, fs, xOriginMm, mmPerSec, yBaseMm, rowHalfMm, types){
+    const parts = [];
+    const typeStyle = {
+      R:{color:'#b91c1c', dy:-1}, P:{color:'#1d4ed8', dy:-1}, Q:{color:'#047857', dy:1},
+      S:{color:'#7c2d12', dy:1},  T:{color:'#6d28d9', dy:-1}, U:{color:'#a16207', dy:-1}
+    };
+    for(const t of types){
+      const style = typeStyle[t];
+      if(!style) continue;
+      const arr = (state.peaks[t] && state.peaks[t][ch]) ? state.peaks[t][ch] : [];
+      if(!arr.length) continue;
+      const tickTop = yBaseMm - Math.min(rowHalfMm * 0.85, 12);
+      const tickBot = tickTop + 1.6;
+      const d = [];
+      const labels = [];
+      for(const p of arr){
+        const idx = (p && p.index != null) ? p.index : p;
+        if(!isFinite(idx) || idx < i0 || idx >= i1) continue;
+        const x = xOriginMm + ((idx - i0) / fs) * mmPerSec;
+        d.push('M' + x.toFixed(2) + ' ' + tickTop.toFixed(2) + 'V' + tickBot.toFixed(2));
+        labels.push('<text x="' + x.toFixed(2) + '" y="' + (tickTop - 0.5).toFixed(2)
+          + '" font-size="2" text-anchor="middle" fill="' + style.color + '">' + t + '</text>');
+      }
+      if(d.length){
+        parts.push('<path d="' + d.join('') + '" fill="none" stroke="' + style.color
+          + '" stroke-width="0.2"/>' + labels.join(''));
+      }
+    }
+    return parts.join('');
+  }
+
+  // Average interval measurements for the header block, derived from the
+  // annotations of the chosen channel via the existing computeStatsForChannel().
+  // QTc uses Bazett's correction (QT / sqrt(RR)), the convention printed on
+  // clinical ECGs; it is reported only when both QT and RR are available.
+  function _ecgxMeasurements(ch){
+    const s = computeStatsForChannel(ch);
+    const out = {
+      hr: s.avgHR, rr: s.avgRR, pr: s.avgPR, qrs: s.avgQRS, qt: s.avgQT, qtc: null
+    };
+    if(s.avgQT != null && isFinite(s.avgQT) && s.avgRR != null && isFinite(s.avgRR) && s.avgRR > 0){
+      out.qtc = s.avgQT / Math.sqrt(s.avgRR / 1000);
+    }
+    return out;
+  }
+
+  // Everything the export form needs to initialize itself, read once when the
+  // form opens. Read-only with respect to app state.
+  function ecgxGetInit(){
+    const [vs0, vs1] = _getVisibleSampleRange();
+    const fs = state.fs || 0;
+    const leadMap = _ecgxLeadMap(state.channelNames);
+    const present = ECGX_LEADS_12.filter(l => leadMap[l] != null);
+    return {
+      recordBase: state.recordBase || '',
+      channelNames: (state.channelNames || []).slice(),
+      units: (state.units || []).slice(),
+      nSamples: state.nSamples || 0,
+      fs: fs,
+      duration: (state.nSamples && fs) ? (state.nSamples / fs) : 0,
+      currentChannel: currentChannel,
+      visStartS: fs ? (vs0 / fs) : 0,
+      visEndS: fs ? (vs1 / fs) : 0,
+      has12Lead: _ecgxHas12Lead(state.channelNames),
+      leadsPresent: present,
+      leadMap: leadMap,
+      pageSizes: ECGX_PAGE_SIZES,
+      speeds: ECGX_MM_PER_SEC_CHOICES.slice(),
+      gains: ECGX_MM_PER_MV_CHOICES.slice(),
+      trimOffsetSec: state.trimOffsetSec || 0
+    };
+  }
+
+  // Resolves the plan for a page set: which cells go where, how many pages, and
+  // the geometry each page is drawn into. Separated from drawing so the form can
+  // show a live page count and warn before anything is rendered.
+  function _ecgxPlan(opts){
+    const fs = state.fs || 0;
+    const page = ECGX_PAGE_SIZES[opts.pageSize] || ECGX_PAGE_SIZES.a4_landscape;
+    const margin = (opts.margin != null) ? Number(opts.margin) : 8;
+    const mmPerSec = Number(opts.mmPerSec) || 25;
+
+    // Header band: the metadata and measurement block sit above the paper area.
+    const headerH = opts.showHeader === false ? 4 : (opts.showMeasurements ? 20 : 13);
+    const footerH = 5;
+
+    const plotX = margin;
+    const plotY = margin + headerH;
+    const plotW = page.w - 2 * margin;
+    const plotH = page.h - 2 * margin - headerH - footerH;
+
+    const calW = opts.calPulse === false ? 0 : _ecgxCalPulseWidth(mmPerSec);
+    const labelW = 7;                                  // room for the lead label
+    const traceX = plotX + labelW + calW;
+    const traceW = plotX + plotW - traceX;
+
+    const s0 = Math.max(0, Math.floor(opts.s0));
+    const s1 = Math.min(state.nSamples, Math.ceil(opts.s1));
+    const totalDur = (s1 - s0) / (fs || 1);
+
+    const plan = {
+      page: page, margin: margin, mmPerSec: mmPerSec,
+      headerH: headerH, footerH: footerH,
+      plotX: plotX, plotY: plotY, plotW: plotW, plotH: plotH,
+      labelW: labelW, calW: calW, traceX: traceX, traceW: traceW,
+      s0: s0, s1: s1, totalDur: totalDur,
+      layout: opts.layout, pages: [], warnings: []
+    };
+
+    const leadMap = _ecgxLeadMap(state.channelNames);
+
+    if(opts.layout === 'grid3x4' || opts.layout === 'grid6x2'){
+      const grid = (opts.layout === 'grid3x4') ? ECGX_GRID_3x4 : ECGX_GRID_6x2;
+      const nCols = grid[0].length;
+      const rhythm = (opts.layout === 'grid3x4' && opts.rhythmLead !== 'none') ? 1 : 0;
+      const nRows = grid.length + rhythm;
+      const rowH = plan.plotH / nRows;
+      const colDur = totalDur / nCols;
+      const cells = [];
+      for(let r = 0; r < grid.length; r++){
+        for(let c = 0; c < nCols; c++){
+          const lead = grid[r][c];
+          const ch = leadMap[lead];
+          if(ch == null) continue;
+          const cs0 = s0 + Math.round(c * colDur * fs);
+          const cs1 = (c === nCols - 1) ? s1 : s0 + Math.round((c + 1) * colDur * fs);
+          cells.push({
+            ch: ch, label: lead, row: r, col: c,
+            x: traceX + c * (traceW / nCols), w: traceW / nCols,
+            yBase: plan.plotY + r * rowH + rowH / 2, halfH: rowH / 2,
+            s0: cs0, s1: cs1,
+            cal: (c === 0), tStart: (cs0 - s0) / (fs || 1)
+          });
+        }
+      }
+      if(rhythm){
+        const rLead = opts.rhythmLead;
+        const rCh = (rLead === 'current') ? currentChannel
+                  : (leadMap[rLead] != null ? leadMap[rLead] : (leadMap['II'] != null ? leadMap['II'] : currentChannel));
+        const rName = (rLead === 'current')
+          ? (state.channelNames[rCh] || ('CH' + rCh))
+          : rLead;
+        cells.push({
+          ch: rCh, label: rName, row: grid.length, col: 0,
+          x: traceX, w: traceW,
+          yBase: plan.plotY + grid.length * rowH + rowH / 2, halfH: rowH / 2,
+          s0: s0, s1: s1, cal: true, tStart: 0, rhythm: true
+        });
+      }
+      plan.pages.push({cells: cells, tStart: 0, tEnd: totalDur});
+      plan.rowH = rowH;
+      plan.secondsPerRow = totalDur / nCols;
+    } else if(opts.layout === 'stacked'){
+      // Every selected channel, full window, one per row, on one page.
+      const chans = (opts.channels || []).slice();
+      if(!chans.length) chans.push(currentChannel);
+      const nRows = chans.length;
+      const rowH = plan.plotH / nRows;
+      const cells = chans.map((ch, r) => ({
+        ch: ch,
+        label: state.channelNames[ch] || ('CH' + ch),
+        row: r, col: 0,
+        x: traceX, w: traceW,
+        yBase: plan.plotY + r * rowH + rowH / 2, halfH: rowH / 2,
+        s0: s0, s1: s1, cal: true, tStart: 0
+      }));
+      plan.pages.push({cells: cells, tStart: 0, tEnd: totalDur});
+      plan.rowH = rowH;
+      plan.secondsPerRow = totalDur;
+    } else {
+      // Continuous rhythm strips: consecutive time slices stacked down the page,
+      // the way a telemetry or Holter printout reads. Each selected channel gets
+      // its own row within a slice, so a slice is a group of rows.
+      const chans = (opts.channels || []).slice();
+      if(!chans.length) chans.push(currentChannel);
+      // Seconds per row from the usable trace width, rounded down to a whole
+      // second so the row boundaries stay easy to read.
+      let secPerRow = Number(opts.secondsPerRow);
+      if(!isFinite(secPerRow) || secPerRow <= 0) secPerRow = Math.floor(traceW / mmPerSec);
+      secPerRow = Math.max(1, Math.min(secPerRow, Math.floor(traceW / mmPerSec) || 1));
+      const totalGroups = Math.max(1, Math.ceil(totalDur / secPerRow));
+      // Never reserve rows the segment cannot fill: a short segment should use
+      // the full page height rather than leaving blank rows at the bottom.
+      const groupsPerPage = Math.min(Math.max(1, Number(opts.rowsPerPage) || 4), totalGroups);
+      const rowsPerPage = groupsPerPage * chans.length;
+      const rowH = plan.plotH / rowsPerPage;
+      const nPages = Math.ceil(totalGroups / groupsPerPage);
+      for(let p = 0; p < nPages; p++){
+        const cells = [];
+        for(let g = 0; g < groupsPerPage; g++){
+          const gi = p * groupsPerPage + g;
+          if(gi >= totalGroups) break;
+          const tA = gi * secPerRow;
+          const cs0 = s0 + Math.round(tA * fs);
+          if(cs0 >= s1) break;
+          const cs1 = Math.min(s1, s0 + Math.round((tA + secPerRow) * fs));
+          for(let k = 0; k < chans.length; k++){
+            const r = g * chans.length + k;
+            cells.push({
+              ch: chans[k],
+              label: state.channelNames[chans[k]] || ('CH' + chans[k]),
+              row: r, col: 0,
+              x: traceX, w: ((cs1 - cs0) / (fs || 1)) * mmPerSec,
+              yBase: plan.plotY + r * rowH + rowH / 2, halfH: rowH / 2,
+              s0: cs0, s1: cs1, cal: true, tStart: tA
+            });
+          }
+        }
+        if(cells.length){
+          plan.pages.push({
+            cells: cells,
+            tStart: cells[0].tStart,
+            tEnd: Math.min(totalDur, cells[cells.length - 1].tStart + secPerRow)
+          });
+        }
+      }
+      plan.rowH = rowH;
+      plan.secondsPerRow = secPerRow;
+    }
+
+    // Clipping headroom is what actually matters to a reader, so the warning is
+    // stated in millivolts at the chosen gain rather than in bare millimeters.
+    // A row that cannot show +/-1 mV will clip ordinary R waves.
+    if(plan.rowH){
+      const halfMv = (plan.rowH / 2) / (Number(opts.mmPerMv) || 10);
+      if(halfMv < 1.0){
+        plan.warnings.push('Each row can show only \u00b1' + halfMv.toFixed(2)
+          + ' mV at this gain (row height ' + plan.rowH.toFixed(1)
+          + ' mm), so tall QRS complexes will be clipped. Use fewer rows per page, a larger page, or a lower gain.');
+      }
+    }
+    if(plan.pages.length > 20){
+      plan.warnings.push(plan.pages.length + ' pages will be produced. Consider exporting a shorter segment.');
+    }
+    return plan;
+  }
+
+  // Draws one page as a standalone SVG string, sized in millimeters.
+  function _ecgxRenderPage(plan, pageObj, pageNo, nPages, opts, ctx){
+    const P = plan.page;
+    const gridCols = ECGX_GRID_COLORS[opts.grid] || ECGX_GRID_COLORS.red;
+    const traceColor = opts.traceColor || '#000000';
+    const out = [];
+
+    out.push('<svg class="ecgx-page" xmlns="http://www.w3.org/2000/svg" '
+      + 'width="' + P.w + 'mm" height="' + P.h + 'mm" '
+      + 'viewBox="0 0 ' + P.w + ' ' + P.h + '" '
+      + 'style="background:#ffffff" '
+      + 'font-family="Helvetica, Arial, sans-serif">');
+    out.push('<rect x="0" y="0" width="' + P.w + '" height="' + P.h + '" fill="#ffffff"/>');
+
+    // ---- ECG paper grid ----
+    if(gridCols[0]){
+      out.push('<path d="' + _ecgxGridPath(plan.plotX, plan.plotY, plan.plotW, plan.plotH, 1)
+        + '" fill="none" stroke="' + gridCols[0] + '" stroke-width="0.09"/>');
+      out.push('<path d="' + _ecgxGridPath(plan.plotX, plan.plotY, plan.plotW, plan.plotH, 5)
+        + '" fill="none" stroke="' + gridCols[1] + '" stroke-width="0.22"/>');
+    }
+
+    // ---- Header ----
+    if(opts.showHeader !== false){
+      const hx = plan.margin, hy = plan.margin;
+      const title = opts.title || ('ECG — ' + (ctx.recordBase || 'record'));
+      out.push('<text x="' + hx + '" y="' + (hy + 3.6).toFixed(2)
+        + '" font-size="4" font-weight="bold" fill="#000">' + _ecgxEsc(title) + '</text>');
+
+      const line2 = [];
+      if(ctx.recordBase) line2.push('Record: ' + ctx.recordBase);
+      line2.push('Sampling rate: ' + ctx.fs + ' Hz');
+      line2.push('Segment: ' + _ecgxFmt(plan.s0 / (ctx.fs || 1), 2) + '–'
+        + _ecgxFmt(plan.s1 / (ctx.fs || 1), 2) + ' s');
+      if(ctx.trimOffsetSec) line2.push('Trim offset: ' + ctx.trimOffsetSec.toFixed(3) + ' s');
+      line2.push(ctx.stamp);
+      out.push('<text x="' + hx + '" y="' + (hy + 8).toFixed(2)
+        + '" font-size="2.7" fill="#333">' + _ecgxEsc(line2.join('   ·   ')) + '</text>');
+
+      if(opts.showMeasurements && ctx.meas){
+        const m = ctx.meas;
+        const cells = [
+          ['HR',  (m.hr  != null && isFinite(m.hr))  ? _ecgxFmt(m.hr, 0)  + ' bpm' : '—'],
+          ['RR',  (m.rr  != null && isFinite(m.rr))  ? _ecgxFmt(m.rr, 0)  + ' ms'  : '—'],
+          ['PR',  (m.pr  != null && isFinite(m.pr))  ? _ecgxFmt(m.pr, 0)  + ' ms'  : '—'],
+          ['QRS', (m.qrs != null && isFinite(m.qrs)) ? _ecgxFmt(m.qrs, 0) + ' ms'  : '—'],
+          ['QT',  (m.qt  != null && isFinite(m.qt))  ? _ecgxFmt(m.qt, 0)  + ' ms'  : '—'],
+          ['QTc', (m.qtc != null && isFinite(m.qtc)) ? _ecgxFmt(m.qtc, 0) + ' ms'  : '—']
+        ];
+        let mx = hx;
+        for(const [k, v] of cells){
+          out.push('<text x="' + mx.toFixed(2) + '" y="' + (hy + 13).toFixed(2)
+            + '" font-size="2.5" fill="#666">' + k + '</text>');
+          out.push('<text x="' + mx.toFixed(2) + '" y="' + (hy + 17).toFixed(2)
+            + '" font-size="3.2" font-weight="bold" fill="#000">' + _ecgxEsc(v) + '</text>');
+          mx += 22;
+        }
+        out.push('<text x="' + mx.toFixed(2) + '" y="' + (hy + 16).toFixed(2)
+          + '" font-size="2.4" fill="#666">Averages from annotations on '
+          + _ecgxEsc(ctx.measChannelName) + '; QTc by Bazett</text>');
+      }
+
+      if(opts.notes){
+        out.push('<text x="' + (P.w - plan.margin).toFixed(2) + '" y="' + (hy + 3.6).toFixed(2)
+          + '" font-size="2.7" text-anchor="end" fill="#333">' + _ecgxEsc(opts.notes) + '</text>');
+      }
+    }
+
+    // ---- Cells ----
+    for(const cell of pageObj.cells){
+      const sig = state.signals[cell.ch];
+      if(!sig) continue;
+      const uc = _ecgxUnitToMv(state.units[cell.ch]);
+      // mm per stored unit = (mm per mV) x (mV per stored unit)
+      const mmPerUnit = Number(opts.mmPerMv) * uc.factor;
+      const baseline = (opts.baseline === 'zero') ? 0 : _ecgxBaseline(sig, cell.s0, cell.s1);
+      const clampMm = cell.halfH * 0.98;
+
+      const d = _ecgxTracePath(sig, cell.s0, cell.s1, ctx.fs, cell.x, plan.mmPerSec,
+                               cell.yBase, baseline, mmPerUnit, clampMm);
+      if(d){
+        out.push('<path d="' + d + '" fill="none" stroke="' + traceColor
+          + '" stroke-width="' + (opts.traceWidth || 0.25) + '" stroke-linejoin="round" stroke-linecap="round"/>');
+      }
+
+      if(opts.calPulse !== false && cell.cal){
+        out.push('<path d="' + _ecgxCalPulse(plan.plotX + plan.labelW, cell.yBase, plan.mmPerSec, Number(opts.mmPerMv))
+          + '" fill="none" stroke="' + traceColor + '" stroke-width="' + (opts.traceWidth || 0.25) + '"/>');
+      }
+
+      // Lead label, above the baseline at the left edge of the cell.
+      // Offset past the column separator tick at cell.x, and high enough to clear
+      // a normal R wave while staying beside its own trace.
+      const labelDy = Math.min(cell.halfH * 0.8, 9);
+      out.push('<text x="' + (cell.x + 1.6).toFixed(2) + '" y="' + (cell.yBase - labelDy).toFixed(2)
+        + '" font-size="3.2" font-weight="bold" fill="#000">' + _ecgxEsc(cell.label) + '</text>');
+
+      // Elapsed-time label for continuous strips, so a row can be located in the record.
+      if(opts.showRowTimes && !cell.rhythm && cell.col === 0 && plan.layout === 'strips'){
+        out.push('<text x="' + (cell.x + 1.6).toFixed(2)
+          + '" y="' + (cell.yBase + Math.min(cell.halfH * 0.9, 4.5)).toFixed(2)
+          + '" font-size="2.3" fill="#666">' + _ecgxFmt(cell.tStart + plan.s0 / (ctx.fs || 1), 1) + ' s</text>');
+      }
+
+      if(opts.showAnnotations && ctx.annTypes.length){
+        out.push(_ecgxAnnotationMarks(cell.ch, cell.s0, cell.s1, ctx.fs, cell.x, plan.mmPerSec,
+                                      cell.yBase, cell.halfH, ctx.annTypes));
+      }
+
+      // Column separator tick between the segments of a 3x4 / 6x2 page.
+      if(cell.col > 0){
+        out.push('<path d="M' + cell.x.toFixed(2) + ' ' + (cell.yBase - cell.halfH * 0.7).toFixed(2)
+          + 'V' + (cell.yBase + cell.halfH * 0.7).toFixed(2)
+          + '" stroke="#999" stroke-width="0.15" fill="none"/>');
+      }
+    }
+
+    // ---- Footer: the scale statement, which is what makes the printout measurable ----
+    const fy = P.h - plan.margin + 1;
+    let footL = plan.mmPerSec + ' mm/s   ·   ' + _ecgxGainLabel(opts, ctx);
+    if(ctx.filterNote) footL += '   ·   ' + ctx.filterNote;
+    // Keep the left footer clear of the centered disclaimer: at 2.6 mm type a
+    // character runs about 1.45 mm, and the centered text needs roughly 70 mm.
+    const maxChars = Math.max(20, Math.floor((P.w / 2 - plan.margin - 36) / 1.45));
+    if(footL.length > maxChars) footL = footL.slice(0, maxChars - 1) + '…';
+    out.push('<text x="' + plan.margin + '" y="' + fy.toFixed(2)
+      + '" font-size="2.6" fill="#333">' + _ecgxEsc(footL) + '</text>');
+    out.push('<text x="' + (P.w / 2).toFixed(2) + '" y="' + fy.toFixed(2)
+      + '" font-size="2.4" text-anchor="middle" fill="#666">'
+      + 'CardioAnnotate — research use only, not for diagnostic purposes</text>');
+    out.push('<text x="' + (P.w - plan.margin).toFixed(2) + '" y="' + fy.toFixed(2)
+      + '" font-size="2.6" text-anchor="end" fill="#333">Page ' + pageNo + ' of ' + nPages + '</text>');
+
+    out.push('</svg>');
+    return out.join('');
+  }
+
+  // Footer gain text: says "mm/mV" for a record in volt-family units, and
+  // "mm per <unit>" otherwise, so the statement is never wrong about what the
+  // vertical scale means.
+  function _ecgxGainLabel(opts, ctx){
+    if(ctx.unitsKnown) return Number(opts.mmPerMv) + ' mm/mV';
+    return Number(opts.mmPerMv) + ' mm/' + (ctx.unitLabel || 'unit');
+  }
+
+  // Renders the full page set. Returns the SVG strings plus the resolved plan
+  // information the export window needs for its print stylesheet and status line.
+  function ecgxRenderPages(opts){
+    if(!state.nSamples || !state.fs) throw new Error('No record is loaded.');
+    const o = opts || {};
+    const plan = _ecgxPlan(o);
+
+    const measCh = (o.measChannel != null) ? Number(o.measChannel) : currentChannel;
+    const chansInUse = [];
+    for(const pg of plan.pages) for(const c of pg.cells) if(chansInUse.indexOf(c.ch) < 0) chansInUse.push(c.ch);
+    let unitsKnown = true, unitLabel = 'mV';
+    for(const ch of chansInUse){
+      const uc = _ecgxUnitToMv(state.units[ch]);
+      if(!uc.known){ unitsKnown = false; unitLabel = uc.label; }
+    }
+
+    const ctx = {
+      fs: state.fs,
+      recordBase: state.recordBase || '',
+      stamp: new Date().toLocaleString('en-US'),
+      meas: o.showMeasurements ? _ecgxMeasurements(measCh) : null,
+      measChannelName: state.channelNames[measCh] || ('CH' + measCh),
+      annTypes: (o.annotationTypes || ['R']).slice(),
+      filterNote: o.filterNote || '',
+      trimOffsetSec: state.trimOffsetSec || 0,
+      unitsKnown: unitsKnown,
+      unitLabel: unitLabel
+    };
+    if(!unitsKnown){
+      plan.warnings.push('Channel units are "' + unitLabel
+        + '", not millivolts, so the vertical scale is printed as mm per unit rather than mm/mV.');
+    }
+
+    const svgs = [];
+    for(let i = 0; i < plan.pages.length; i++){
+      svgs.push(_ecgxRenderPage(plan, plan.pages[i], i + 1, plan.pages.length, o, ctx));
+    }
+    return {
+      svgs: svgs,
+      nPages: plan.pages.length,
+      pageW: plan.page.w,
+      pageH: plan.page.h,
+      rowHeightMm: plan.rowH || null,
+      secondsPerRow: plan.secondsPerRow || null,
+      warnings: plan.warnings
+    };
+  }
+
+  // Page count and row geometry for the live summary in the form, without
+  // rendering anything.
+  function ecgxEstimate(opts){
+    try{
+      const plan = _ecgxPlan(opts || {});
+      return {
+        nPages: plan.pages.length,
+        rowHeightMm: plan.rowH || null,
+        secondsPerRow: plan.secondsPerRow || null,
+        warnings: plan.warnings
+      };
+    }catch(e){
+      return {nPages: 0, rowHeightMm: null, secondsPerRow: null, warnings: [String(e && e.message || e)]};
+    }
+  }
+
+  // Opens the clinical ECG export window: a form for the paper settings, then a
+  // calibrated preview that prints (or saves as PDF) at exactly 1 mm on paper per
+  // 1 mm in the drawing. Follows the same pattern as the existing report window --
+  // a separate same-origin window that calls back into this tab for its data, so
+  // the live chart and app state are never disturbed.
+  function openECGExportPage(){
+    if(!state.nSamples || !state.fs){
+      alert('Load a record before exporting an ECG.');
+      return;
+    }
+    const init = ecgxGetInit();
+
+    const w = window.open('', 'ecg_export_' + Date.now(), 'width=1100,height=900');
+    if(!w){ alert('Could not open a new window. Please allow pop-ups for this page.'); return; }
+
+    const html = '<!doctype html><html><head><meta charset="utf-8"/>'
+      + '<meta name="viewport" content="width=device-width, initial-scale=1"/>'
+      + '<title>CardioAnnotate \u2014 ECG export</title>'
+      + '<style id="ecgxPageStyle">@page{size:A4 landscape;margin:0;}</style>'
+      + '<style>'
+      + ':root{--xbg:#f1f5f9;--xpanel:#ffffff;--xborder:#e2e8f0;--xtext:#0f172a;--xmuted:#64748b;--xaccent:#2563eb;}'
+      + '*{box-sizing:border-box;}'
+      + 'html,body{margin:0;background:var(--xbg);color:var(--xtext);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}'
+      + '.wrap{max-width:900px;margin:0 auto;padding:20px 20px 60px 20px;}'
+      + 'h1{font-size:20px;margin:0 0 4px 0;}'
+      + 'h2{font-size:14px;margin:0 0 10px 0;padding-bottom:6px;border-bottom:2px solid var(--xborder);}'
+      + 'label{display:block;font-size:12.5px;font-weight:600;color:var(--xmuted);margin:10px 0 4px 0;}'
+      + 'input[type=text],input[type=number],textarea,select{width:100%;padding:7px 9px;border:1px solid var(--xborder);border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:var(--xtext);}'
+      + 'textarea{min-height:46px;resize:vertical;}'
+      + '.row{display:flex;gap:14px;flex-wrap:wrap;}'
+      + '.row>div{flex:1;min-width:150px;}'
+      + '.card{background:var(--xpanel);border:1px solid var(--xborder);border-radius:10px;padding:16px 18px;margin-bottom:16px;}'
+      + '.btn{font-size:13px;padding:9px 16px;border-radius:8px;cursor:pointer;border:1px solid var(--xborder);background:#fff;color:var(--xtext);}'
+      + '.btn.primary{background:var(--xaccent);border-color:var(--xaccent);color:#fff;font-weight:600;}'
+      + '.btn:disabled{opacity:0.6;cursor:default;}'
+      + '.chkgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 14px;margin-top:6px;}'
+      + '.chkgrid label{display:flex;align-items:center;gap:7px;font-weight:400;color:var(--xtext);font-size:13px;margin:0;}'
+      + '.chkgrid input{width:auto;}'
+      + '.radiorow{display:flex;gap:16px;align-items:center;margin-top:6px;font-size:13px;flex-wrap:wrap;}'
+      + '.radiorow label{display:flex;align-items:center;gap:6px;font-weight:400;color:var(--xtext);margin:0;}'
+      + '.radiorow input{width:auto;}'
+      + '.hint{font-size:11px;color:var(--xmuted);margin-top:4px;}'
+      + '.warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-top:10px;}'
+      + '.summary{font-size:12.5px;background:#f8fafc;border:1px solid var(--xborder);border-radius:8px;padding:9px 11px;margin-top:12px;}'
+      + '.summary b{font-weight:700;}'
+      + '#ecgxView{display:none;}'
+      + '.xbar{display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--xpanel);border-bottom:1px solid var(--xborder);position:sticky;top:0;z-index:5;flex-wrap:wrap;}'
+      + '.xbar .sp{flex:1;}'
+      + '.xbar .note{font-size:11.5px;color:var(--xmuted);max-width:420px;line-height:1.35;}'
+      + '.xbar select{width:auto;}'
+      + '#ecgxPages{padding:16px;overflow:auto;}'
+      + '.ecgx-page{display:block;margin:0 auto 16px auto;background:#fff;box-shadow:0 2px 12px rgba(15,23,42,0.18);}'
+      + '@media print{'
+      + '.no-print{display:none !important;}'
+      + 'html,body{margin:0 !important;padding:0 !important;background:#fff !important;}'
+      + '#ecgxPages{padding:0 !important;margin:0 !important;overflow:visible !important;zoom:1 !important;}'
+      + '.ecgx-page{margin:0 !important;box-shadow:none !important;page-break-after:always;break-after:page;}'
+      + '.ecgx-page:last-child{page-break-after:auto;break-after:auto;}'
+      + '}'
+      + '</style></head><body>'
+
+      // ---------------- options form ----------------
+      + '<div id="ecgxForm"><div class="wrap">'
+      + '<h1>CardioAnnotate &mdash; ECG export (clinical format)</h1>'
+      + '<div class="hint" style="margin-bottom:14px">Prints the signal on a standard ECG grid at a calibrated paper speed and gain, so intervals and amplitudes can be measured directly off the page.</div>'
+
+      + '<div class="card"><h2>Identification</h2>'
+      + '<div class="row">'
+      + '<div><label>Title</label><input type="text" id="xTitle"/></div>'
+      + '<div><label>Note (printed top-right)</label><input type="text" id="xNotes" placeholder="e.g. session or subject reference"/></div>'
+      + '</div>'
+      + '<label>Filter annotation for the footer</label>'
+      + '<input type="text" id="xFilter" placeholder="e.g. 0.5-40 Hz band-pass, 60 Hz notch"/>'
+      + '<div class="hint">Printed in the footer next to the speed and gain, as on a clinical ECG. Describe the processing actually applied in the app; it is not read automatically.</div>'
+      + '</div>'
+
+      + '<div class="card"><h2>Segment</h2>'
+      + '<div class="radiorow">'
+      + '<label><input type="radio" name="xSeg" value="visible" checked/> Visible window</label>'
+      + '<label><input type="radio" name="xSeg" value="full"/> Whole record</label>'
+      + '<label><input type="radio" name="xSeg" value="custom"/> Custom</label>'
+      + '</div>'
+      + '<div class="row" id="xCustomRange" style="display:none;margin-top:8px">'
+      + '<div><label>Start (s)</label><input type="number" id="xStartS" step="0.01" min="0"/></div>'
+      + '<div><label>Duration (s)</label><input type="number" id="xDurS" step="0.01" min="0.1" value="10"/></div>'
+      + '</div>'
+      + '<div class="hint" id="xSegInfo"></div>'
+      + '</div>'
+
+      + '<div class="card"><h2>Layout</h2>'
+      + '<label>Page layout</label><select id="xLayout"></select>'
+      + '<div class="hint" id="xLayoutHint"></div>'
+      + '<div id="xRhythmWrap"><label>Rhythm strip lead (full width, below the grid)</label><select id="xRhythm"></select></div>'
+      + '<div id="xChanWrap"><label>Channels to print</label><div class="chkgrid" id="xChans"></div></div>'
+      + '<div class="row" id="xStripWrap">'
+      + '<div><label>Seconds per row</label><input type="number" id="xSecPerRow" step="0.5" min="1"/><div class="hint">Blank or 0 fits the row to the page width.</div></div>'
+      + '<div><label>Rows per page</label><input type="number" id="xRowsPerPage" step="1" min="1" max="12" value="4"/><div class="hint">Time slices per page; each selected channel adds a row inside a slice.</div></div>'
+      + '</div>'
+      + '</div>'
+
+      + '<div class="card"><h2>Paper</h2>'
+      + '<div class="row">'
+      + '<div><label>Paper speed</label><select id="xSpeed"></select></div>'
+      + '<div><label>Gain</label><select id="xGain"></select></div>'
+      + '<div><label>Page size</label><select id="xPage"></select></div>'
+      + '</div>'
+      + '<div class="row">'
+      + '<div><label>Grid</label><select id="xGrid">'
+      + '<option value="red" selected>Red (standard ECG paper)</option>'
+      + '<option value="gray">Gray</option>'
+      + '<option value="none">No grid</option>'
+      + '</select></div>'
+      + '<div><label>Margin (mm)</label><input type="number" id="xMargin" step="1" min="0" max="25" value="8"/></div>'
+      + '<div><label>Trace thickness (mm)</label><input type="number" id="xTraceW" step="0.05" min="0.1" max="0.6" value="0.25"/></div>'
+      + '</div>'
+      + '<div class="row">'
+      + '<div><label>Baseline</label><select id="xBaseline">'
+      + '<option value="median" selected>Center on segment median</option>'
+      + '<option value="zero">Keep signal zero</option>'
+      + '</select><div class="hint">Centering removes a DC offset or slow drift so the trace stays inside its row.</div></div>'
+      + '</div>'
+      + '</div>'
+
+      + '<div class="card"><h2>Include</h2>'
+      + '<div class="chkgrid" style="grid-template-columns:repeat(2,minmax(0,1fr))">'
+      + '<label><input type="checkbox" id="xCal" checked/> 1 mV calibration pulse</label>'
+      + '<label><input type="checkbox" id="xHeader" checked/> Header with record details</label>'
+      + '<label><input type="checkbox" id="xMeas"/> Measurement block (HR, PR, QRS, QT, QTc)</label>'
+      + '<label><input type="checkbox" id="xRowTimes" checked/> Elapsed time on each strip row</label>'
+      + '<label><input type="checkbox" id="xAnn"/> Overlay annotation markers</label>'
+      + '</div>'
+      + '<div id="xAnnWrap" style="display:none">'
+      + '<label>Annotation types to overlay</label>'
+      + '<div class="chkgrid" id="xAnnTypes"></div>'
+      + '<div class="hint">Markers are small ticks above the trace, so the waveform stays readable for measurement.</div>'
+      + '</div>'
+      + '<div id="xMeasWrap" style="display:none"><label>Measurements from channel</label><select id="xMeasCh"></select>'
+      + '<div class="hint">Averages over the whole record, from this channel\'s annotations.</div></div>'
+      + '</div>'
+
+      + '<div id="xSummary" class="summary"></div>'
+      + '<div id="xWarn"></div>'
+      + '<div style="margin-top:16px;display:flex;gap:10px">'
+      + '<button id="xGenerate" class="btn primary">Generate ECG</button>'
+      + '</div>'
+      + '</div></div>'
+
+      // ---------------- calibrated preview ----------------
+      + '<div id="ecgxView">'
+      + '<div class="xbar no-print">'
+      + '<button id="xBack" class="btn">&larr; Back to options</button>'
+      + '<button id="xPrint" class="btn primary">&#128424; Print / Save as PDF</button>'
+      + '<label style="margin:0;font-weight:600">Preview zoom</label>'
+      + '<select id="xZoom">'
+      + '<option value="fit">Fit width</option>'
+      + '<option value="0.5">50%</option><option value="0.75">75%</option>'
+      + '<option value="1">100%</option><option value="1.5">150%</option>'
+      + '</select>'
+      + '<div class="sp"></div>'
+      + '<div class="note" id="xPrintNote"></div>'
+      + '</div>'
+      + '<div id="ecgxPages"></div>'
+      + '</div>'
+
+      + '<script>(function(){'
+      + 'var INIT=' + JSON.stringify(init).replace(/</g, '\\u003c') + ';'
+      + 'var LEADS12=["I","II","III","aVR","aVL","aVF","V1","V2","V3","V4","V5","V6"];'
+      + 'function $(id){return document.getElementById(id);}'
+      + 'function fmt(x,d){return (x==null||!isFinite(x))?"\\u2014":Number(x).toFixed(d);}'
+
+      // ---- initialize the form from the record ----
+      + '$("xTitle").value="ECG \\u2014 "+(INIT.recordBase||"record");'
+      + '$("xStartS").value=Math.round(INIT.visStartS*100)/100;'
+      + 'var visDur=Math.max(0.1,INIT.visEndS-INIT.visStartS);'
+      + '$("xDurS").value=Math.round(visDur*100)/100;'
+
+      + 'var layouts=[];'
+      + 'if(INIT.has12Lead){'
+      + 'layouts.push(["grid3x4","12-lead, 3 x 4 with rhythm strip (standard)"]);'
+      + 'layouts.push(["grid6x2","12-lead, 6 x 2"]);'
+      + '}'
+      + 'layouts.push(["stacked","Stacked leads \\u2014 one row per channel, whole segment"]);'
+      + 'layouts.push(["strips","Continuous rhythm strips \\u2014 consecutive rows down the page"]);'
+      + 'for(var i=0;i<layouts.length;i++){var o=document.createElement("option");o.value=layouts[i][0];o.textContent=layouts[i][1];$("xLayout").appendChild(o);}'
+      + '$("xLayout").value=INIT.has12Lead?"grid3x4":"strips";'
+
+      + 'var ro=document.createElement("option");ro.value="current";ro.textContent="Active channel ("+(INIT.channelNames[INIT.currentChannel]||("CH"+INIT.currentChannel))+")";$("xRhythm").appendChild(ro);'
+      + 'for(var i=0;i<LEADS12.length;i++){if(INIT.leadMap[LEADS12[i]]!=null){var o2=document.createElement("option");o2.value=LEADS12[i];o2.textContent="Lead "+LEADS12[i];$("xRhythm").appendChild(o2);}}'
+      + 'var no=document.createElement("option");no.value="none";no.textContent="No rhythm strip";$("xRhythm").appendChild(no);'
+      + 'if(INIT.leadMap["II"]!=null)$("xRhythm").value="II";'
+
+      + 'for(var i=0;i<INIT.channelNames.length;i++){'
+      + 'var lab=document.createElement("label");var cb=document.createElement("input");'
+      + 'cb.type="checkbox";cb.className="xch";cb.value=String(i);'
+      + 'cb.checked=(i===INIT.currentChannel);'
+      + 'lab.appendChild(cb);lab.appendChild(document.createTextNode(" "+INIT.channelNames[i]));'
+      + '$("xChans").appendChild(lab);}'
+
+      + 'var ANN=["R","P","Q","S","T","U"];'
+      + 'for(var i=0;i<ANN.length;i++){'
+      + 'var lab2=document.createElement("label");var cb2=document.createElement("input");'
+      + 'cb2.type="checkbox";cb2.className="xann";cb2.value=ANN[i];cb2.checked=(ANN[i]==="R");'
+      + 'lab2.appendChild(cb2);lab2.appendChild(document.createTextNode(" "+ANN[i]));'
+      + '$("xAnnTypes").appendChild(lab2);}'
+
+      + 'for(var i=0;i<INIT.speeds.length;i++){var o3=document.createElement("option");o3.value=String(INIT.speeds[i]);'
+      + 'o3.textContent=INIT.speeds[i]+" mm/s"+(INIT.speeds[i]===25?" (standard)":"");'
+      + 'if(INIT.speeds[i]===25)o3.selected=true;$("xSpeed").appendChild(o3);}'
+      + 'for(var i=0;i<INIT.gains.length;i++){var o4=document.createElement("option");o4.value=String(INIT.gains[i]);'
+      + 'o4.textContent=INIT.gains[i]+" mm/mV"+(INIT.gains[i]===10?" (standard)":"");'
+      + 'if(INIT.gains[i]===10)o4.selected=true;$("xGain").appendChild(o4);}'
+      + 'for(var k in INIT.pageSizes){var o5=document.createElement("option");o5.value=k;o5.textContent=INIT.pageSizes[k].label;'
+      + 'if(k==="a4_landscape")o5.selected=true;$("xPage").appendChild(o5);}'
+      + 'for(var i=0;i<INIT.channelNames.length;i++){var o6=document.createElement("option");o6.value=String(i);o6.textContent=INIT.channelNames[i];'
+      + 'if(i===INIT.currentChannel)o6.selected=true;$("xMeasCh").appendChild(o6);}'
+
+      // ---- segment resolution ----
+      + 'function segMode(){var r=document.getElementsByName("xSeg");for(var i=0;i<r.length;i++)if(r[i].checked)return r[i].value;return "visible";}'
+      + 'function segSamples(){'
+      + 'var fs=INIT.fs||1,n=INIT.nSamples||0,m=segMode();'
+      + 'if(m==="full")return [0,n];'
+      + 'if(m==="custom"){'
+      + 'var st=Number($("xStartS").value)||0,du=Number($("xDurS").value)||0;'
+      + 'if(du<=0)du=10;'
+      + 'var a=Math.max(0,Math.round(st*fs)),b=Math.min(n,Math.round((st+du)*fs));'
+      + 'if(b<=a)b=Math.min(n,a+Math.round(fs));return [a,b];}'
+      + 'return [Math.max(0,Math.round(INIT.visStartS*fs)),Math.min(n,Math.round(INIT.visEndS*fs))];'
+      + '}'
+
+      + 'function selectedChannels(){'
+      + 'var out=[],cbs=document.querySelectorAll(".xch");'
+      + 'for(var i=0;i<cbs.length;i++)if(cbs[i].checked)out.push(Number(cbs[i].value));'
+      + 'return out;}'
+      + 'function selectedAnnTypes(){'
+      + 'var out=[],cbs=document.querySelectorAll(".xann");'
+      + 'for(var i=0;i<cbs.length;i++)if(cbs[i].checked)out.push(cbs[i].value);'
+      + 'return out;}'
+
+      + 'function buildOpts(){'
+      + 'var seg=segSamples();'
+      + 'var spr=Number($("xSecPerRow").value);'
+      + 'return {'
+      + 's0:seg[0],s1:seg[1],'
+      + 'layout:$("xLayout").value,'
+      + 'channels:selectedChannels(),'
+      + 'rhythmLead:$("xRhythm").value,'
+      + 'secondsPerRow:(isFinite(spr)&&spr>0)?spr:null,'
+      + 'rowsPerPage:Number($("xRowsPerPage").value)||4,'
+      + 'mmPerSec:Number($("xSpeed").value)||25,'
+      + 'mmPerMv:Number($("xGain").value)||10,'
+      + 'pageSize:$("xPage").value,'
+      + 'grid:$("xGrid").value,'
+      + 'margin:Number($("xMargin").value),'
+      + 'traceWidth:Number($("xTraceW").value)||0.25,'
+      + 'baseline:$("xBaseline").value,'
+      + 'calPulse:$("xCal").checked,'
+      + 'showHeader:$("xHeader").checked,'
+      + 'showMeasurements:$("xMeas").checked,'
+      + 'showRowTimes:$("xRowTimes").checked,'
+      + 'showAnnotations:$("xAnn").checked,'
+      + 'annotationTypes:selectedAnnTypes(),'
+      + 'measChannel:Number($("xMeasCh").value),'
+      + 'title:$("xTitle").value,'
+      + 'notes:$("xNotes").value,'
+      + 'filterNote:$("xFilter").value'
+      + '};}'
+
+      // ---- live summary / visibility ----
+      + 'function syncVisibility(){'
+      + 'var L=$("xLayout").value;'
+      + '$("xCustomRange").style.display=(segMode()==="custom")?"flex":"none";'
+      + '$("xRhythmWrap").style.display=(L==="grid3x4")?"block":"none";'
+      + '$("xChanWrap").style.display=(L==="stacked"||L==="strips")?"block":"none";'
+      + '$("xStripWrap").style.display=(L==="strips")?"flex":"none";'
+      + '$("xAnnWrap").style.display=$("xAnn").checked?"block":"none";'
+      + '$("xMeasWrap").style.display=$("xMeas").checked?"block":"none";'
+      + 'var hints={'
+      + 'grid3x4:"Each of the four columns carries 2.5 s of the segment, in the conventional order I, aVR, V1, V4 / II, aVL, V2, V5 / III, aVF, V3, V6, with one lead printed full width underneath as the rhythm strip.",'
+      + 'grid6x2:"Two columns of 6 leads, each column carrying half the segment.",'
+      + 'stacked:"Every selected channel on its own row, each showing the whole segment.",'
+      + 'strips:"The segment is cut into consecutive rows that read down the page, as on a telemetry or Holter printout. Long segments continue onto further pages."'
+      + '};'
+      + '$("xLayoutHint").textContent=hints[L]||"";'
+      + 'updateSummary();}'
+
+      + 'function updateSummary(){'
+      + 'var seg=segSamples(),fs=INIT.fs||1;'
+      + 'var dur=(seg[1]-seg[0])/fs;'
+      + '$("xSegInfo").textContent="Record is "+fmt(INIT.duration,2)+" s at "+INIT.fs+" Hz. Selected: "'
+      + '+fmt(seg[0]/fs,2)+" s to "+fmt(seg[1]/fs,2)+" s ("+fmt(dur,2)+" s).";'
+      + 'var est=null;'
+      + 'try{est=window.opener&&!window.opener.closed?window.opener.ecgxEstimate(buildOpts()):null;}catch(e){est=null;}'
+      + 'var mmps=Number($("xSpeed").value)||25,mmpmv=Number($("xGain").value)||10;'
+      + 'var bits=["<b>"+mmps+" mm/s</b> \\u2014 1 mm = "+fmt(1000/mmps,1)+" ms, one large square = "+fmt(5000/mmps,0)+" ms",'
+      + '"<b>"+mmpmv+" mm/mV</b> \\u2014 1 mm = "+fmt(1/mmpmv,3)+" mV, one large square = "+fmt(5/mmpmv,2)+" mV"];'
+      + 'if(est){'
+      + 'bits.push("<b>"+est.nPages+"</b> page"+(est.nPages===1?"":"s"));'
+      + 'if(est.rowHeightMm)bits.push("row height "+fmt(est.rowHeightMm,1)+" mm (\\u00b1"+fmt(est.rowHeightMm/2/mmpmv,2)+" mV before clipping)");'
+      + 'if(est.secondsPerRow)bits.push(fmt(est.secondsPerRow,2)+" s per row");'
+      + '}'
+      + '$("xSummary").innerHTML=bits.join("<br/>");'
+      + 'var wh="";'
+      + 'if(est&&est.warnings&&est.warnings.length){'
+      + 'for(var i=0;i<est.warnings.length;i++)wh+="<div class=\\"warn\\">"+est.warnings[i]+"</div>";}'
+      + '$("xWarn").innerHTML=wh;'
+      + '}'
+
+      + 'var watch=["xLayout","xRhythm","xSecPerRow","xRowsPerPage","xSpeed","xGain","xPage","xGrid","xMargin","xTraceW","xStartS","xDurS","xHeader","xMeas","xAnn","xCal","xRowTimes","xBaseline"];'
+      + 'for(var i=0;i<watch.length;i++){var el=$(watch[i]);if(el){el.addEventListener("change",syncVisibility);el.addEventListener("input",updateSummary);}}'
+      + 'var segR=document.getElementsByName("xSeg");'
+      + 'for(var i=0;i<segR.length;i++)segR[i].addEventListener("change",syncVisibility);'
+      + 'document.addEventListener("change",function(e){if(e.target&&(e.target.className==="xch"||e.target.className==="xann"))updateSummary();});'
+      + 'syncVisibility();'
+
+      // ---- generate ----
+      + '$("xGenerate").addEventListener("click",function(){'
+      + 'if(!window.opener||window.opener.closed){alert("The main CardioAnnotate tab is no longer available. Please reopen the export from the app.");return;}'
+      + 'var opts=buildOpts();'
+      + 'if((opts.layout==="stacked"||opts.layout==="strips")&&!opts.channels.length){alert("Select at least one channel to print.");return;}'
+      + 'var btn=this;btn.disabled=true;btn.textContent="Rendering\\u2026";'
+      + 'setTimeout(function(){'
+      + 'try{'
+      + 'var res=window.opener.ecgxRenderPages(opts);'
+      + 'var ps=INIT.pageSizes[opts.pageSize];'
+      + '$("ecgxPageStyle").textContent="@page{size:"+res.pageW+"mm "+res.pageH+"mm;margin:0;}";'
+      + '$("ecgxPages").innerHTML=res.svgs.join("");'
+      + '$("xPrintNote").innerHTML="For a measurable printout, set <b>Scale</b> to 100% (not \\u201cFit to page\\u201d) and <b>Margins</b> to None in the print dialog, and choose "+ps.label.replace(/ \\(.*/,"")+" paper. Saving as PDF keeps the same scale.";'
+      + '$("ecgxForm").style.display="none";'
+      + '$("ecgxView").style.display="block";'
+      + 'applyZoom();'
+      + 'window.scrollTo(0,0);'
+      + '}catch(e){alert("ECG export failed: "+(e&&e.message?e.message:String(e)));}'
+      + 'btn.disabled=false;btn.textContent="Generate ECG";'
+      + '},30);'
+      + '});'
+
+      + '$("xBack").addEventListener("click",function(){'
+      + '$("ecgxView").style.display="none";$("ecgxForm").style.display="block";'
+      + '$("ecgxPages").innerHTML="";window.scrollTo(0,0);});'
+
+      // ---- preview zoom: screen only, forced back to 1 for printing ----
+      + 'function applyZoom(){'
+      + 'var z=$("xZoom").value,pg=$("ecgxPages");'
+      + 'var first=pg.querySelector("svg");'
+      + 'if(z==="fit"){'
+      + 'if(first){'
+      + 'var wmm=parseFloat(first.getAttribute("width"))||297;'
+      + 'var px=wmm*96/25.4;'
+      + 'z=Math.min(1,(pg.clientWidth-24)/px);'
+      + '}else{z=1;}'
+      + '}'
+      + 'pg.style.zoom=String(z);}'
+      + '$("xZoom").addEventListener("change",applyZoom);'
+      + 'window.addEventListener("resize",function(){if($("xZoom").value==="fit")applyZoom();});'
+
+      + '$("xPrint").addEventListener("click",function(){'
+      + 'var pg=$("ecgxPages"),prev=pg.style.zoom;'
+      + 'pg.style.zoom="1";'
+      + 'window.onafterprint=function(){pg.style.zoom=prev;window.onafterprint=null;};'
+      + 'setTimeout(function(){window.print();},60);'
+      + '});'
+
+      + '})();<\/script></body></html>';
+
+    w.document.write(html);
+    w.document.close();
+  }
+
+  const btnOpenECGExport = document.getElementById('btnOpenECGExport');
+  if(btnOpenECGExport){
+    btnOpenECGExport.addEventListener('click', ()=>{
+      try{ openECGExportPage(); }
+      catch(e){ console.error('ECG export failed', e); alert('ECG export failed: ' + (e.message||String(e))); }
+    });
+  }
+
   // ---------- boot ----------
   ensureAllRPeakMeta();
   renderRRReviewSummary();
@@ -8008,6 +9909,23 @@ if(btnRRRemove){
       <button id="btnCloseChangelog" title="Close">✕</button>
     </header>
     <div class="cl-body">
+      <h3><span class="tag pre">PRE-RELEASE</span> v0.4.0 — Find-peaks height bounds, signal trimming, and clinical ECG export</h3>
+      <ul>
+        <li>New <b>Height</b> option for <i>Find peaks (basic)</i>, mirroring SciPy's <code>find_peaks(height=...)</code>: leave it blank for no limit, enter one number for a minimum height, or two numbers (<code>min, max</code>) for a required height range. The first number is always the minimum. Heights are compared against <i>x</i> for Maxima, the depth <i>&minus;x</i> for Minima, and <i>|x|</i> for |x| maxima. The value is saved per peak type and in sessions.</li>
+        <li>New <b>Trim signal</b> controls (Signal Operations): keep a range [start, end) in seconds or samples (end exclusive, like a Python slice), fill the range from the visible window, or trim straight to the visible window. All channels are trimmed; annotations shift to the new start and those outside the range are dropped.</li>
+        <li>Trimming becomes the new baseline: the original (pre-processing) signal is trimmed to the same time span so <i>Reset all signals</i> stays aligned. A one-level <b>Undo trim</b> restores the exact state from before the trim.</li>
+        <li>The cumulative trim offset from the loaded record is shown in the metadata panel and stored in sessions and NPZ bundles.</li>
+        <li>New <b>Undo</b> and <b>Redo</b> buttons, with <b>Ctrl+Z</b> / <b>Ctrl+Y</b> (<b>Ctrl+Shift+Z</b> also redoes; Cmd on macOS) as keyboard shortcuts: step back and forward through the last 50 changes, restoring all annotations (and the RR review state) to just before or after each one. Manual annotation edits are included one step at a time &mdash; adding a peak, <i>Remove nearest</i>, <i>Remove Last</i>, and R-peak classification &mdash; alongside the bulk <i>Detect &amp; assign</i>, <i>Snap/Adjust</i>, and <i>Clear peaks</i> operations, so a misplaced click during annotation can be taken back immediately. The button tooltips name the change that will be undone or redone. A new change clears the redo history, and if annotations were edited after an undo, redo asks before discarding those edits. Both histories are cleared when a new record or annotation file is loaded, and after trimming, undoing a trim, or reprojecting annotations. Because each manual edit stores a full annotation snapshot, the two histories are also bounded by an approximate memory budget, dropping their oldest entries first on very long records.</li>
+        <li>New <b>keyboard shortcuts for the annotation mode</b>, so the <i>Mode</i> selector no longer has to be reached with the pointer between annotations: <b>0</b> Navigate, <b>1</b> Add R (Normal), <b>2</b> Add P, <b>3</b> Add T, <b>4</b> Add U, <b>5</b> Add Q, <b>6</b> Add S, <b>7</b> Remove nearest. The shortcut is shown next to each option, the active mode is echoed in the log, and switching by key behaves exactly like changing the selector. The digit is read from the physical key, so the numeric keypad works with Num Lock either way, as do layouts on which the top-row digits need Shift. The keys stay live while the <i>Mode</i> selector, a checkbox, a radio button, a slider or a button has focus, and step aside only for a text or number field and for other selectors, where typing a digit is already a useful shortcut (<i>Notch</i> and <i>Mains</i> have options such as &ldquo;50 Hz&rdquo;).</li>
+        <li>Two new checkboxes next to the viewer controls turn the chart's hover boxes on and off independently, so the plot can be read or screenshotted without labels getting in the way. <b>Hover coordinates</b> controls the box reporting the x/y coordinates of the ECG trace; <b>Annotation tooltips</b> controls the box over an annotation marker &mdash; the peak type and sample for R/P/Q/S/T/U markers, and the full case detail for RR-review rings, interval segments and previews. Both default to on and are saved in sessions. Clicking the chart is unaffected either way: adding and removing annotations, and clicking a flagged ring to open its review panel, keep working with the boxes turned off.</li>
+        <li>Fix: the single-letter beat-label shortcuts no longer fire when a modifier key is held, so browser and OS accelerators such as Ctrl+S, Ctrl+A and Ctrl+Z can no longer reclassify the last R-peak as a side effect. They also no longer go dead after a click on a checkbox, radio button, slider or file picker, none of which takes typed text.</li>
+        <li>New <b>ECG export</b> button in the header produces the record on a standard ECG grid at a calibrated paper speed and gain, so a reader can measure intervals and amplitudes directly off the printed page with calipers or a ruler. The page is emitted as an SVG sized in millimeters with a matching <code>@page</code> rule, so one millimeter in the drawing is one millimeter on paper when the print dialog is left at 100% scale; the print bar states the settings to use. Output goes through the browser's own print dialog, so it saves as PDF with no new dependency.</li>
+        <li>Paper settings follow clinical convention and are all selectable: speed 12.5 / <b>25</b> / 50 mm/s, gain 2.5 / 5 / <b>10</b> / 20 mm/mV, a 1 mm minor and 5 mm major grid in red (standard thermal paper), gray or off, A4 or Letter in either orientation, and an optional 1 mV by 200 ms calibration pulse at the start of each row. The footer prints the speed, the gain and a free-text filter annotation, as on a clinical trace.</li>
+        <li>Four layouts. When all twelve standard leads are present in the record they are recognized from their signal names &mdash; including the <code>MLII</code> style used by MIT-BIH and the <code>AVR</code> / <code>v5</code> spelling variants &mdash; and the <b>3 x 4 with rhythm strip</b> layout is offered in the conventional cell order (I, aVR, V1, V4 / II, aVL, V2, V5 / III, aVF, V3, V6) with one full-width rhythm lead beneath, alongside a <b>6 x 2</b> layout. For any channel count there is <b>stacked leads</b>, one row per channel over the whole segment, and <b>continuous rhythm strips</b>, which cut the segment into consecutive rows reading down the page as on a telemetry or Holter printout and continue onto further pages as needed.</li>
+        <li>The segment can be the visible window, the whole record, or a custom start and duration. The form reports the resulting page count, row height and the millivolts a row can show before clipping, and warns before producing a long page set or rows too short for tall QRS complexes.</li>
+        <li>Optional header with the record details and an optional measurement block (HR, RR, PR, QRS, QT and QTc by Bazett's correction) taken from the existing whole-channel annotation averages. Annotation markers for any of R, P, Q, S, T and U can be overlaid as small ticks above the trace; they are off by default so the waveform stays clean for measurement. Every page carries a research-use-only footer.</li>
+        <li>Traces are drawn with per-pixel min/max decimation, so narrow QRS spikes keep their full height on long segments instead of being thinned away, and each row is centered on its own segment median so a DC offset or slow baseline drift does not push the trace out of its row. Channels recorded in V, &micro;V or nV are converted so the mm/mV gain means what it says; any other unit is printed as mm per unit instead.</li>
+      </ul>
       <h3><span class="tag pre">PRE-RELEASE</span> v0.3.0 — PSD visualization and report generation</h3>
       <ul>
         <li>New <b>Report generation</b> Include the ability to generate and print reports of the analysis.</li>
@@ -8027,7 +9945,7 @@ if(btnRRRemove){
         <li>Flagged markers redesigned. The original R-peak fill is retained and status is shown as a hollow ring plus a colored interval segment (amber / blue / cyan / orange / magenta / green), with full hover detail.</li>
         <li>Complete undo for all structural repairs, and cached RR corrections are invalidated on peak add/delete/move, re-detection, channel change, segment change and import.</li>
         <li>HRV fix: excluded intervals keep their sequence position as missing values, so RMSSD, NN50, pNN50 and the Poincaré descriptors only use originally adjacent pairs.</li>
-        <li>GP defaults preserved: kernels, hyper-parameter values and RR-in-seconds convention are unchanged. GP now also reports posterior uncertainty, and is centred on the training mean (documented fix for a zero-mean posterior collapse).</li>
+        <li>GP defaults preserved: kernels, hyper-parameter values and RR-in-seconds convention are unchanged. GP now also reports posterior uncertainty, and is centered on the training mean (documented fix for a zero-mean posterior collapse).</li>
         <li>New RR-correction metadata in the details view, in CSV export and in saved sessions.</li>
         <li>Add support for unit time coordinate on the x-axis.</li>
         <li>Updated PSD formulation.</li>
@@ -8043,7 +9961,7 @@ if(btnRRRemove){
 <!-- Footer -->
 <footer id="appFooter">
   © 2026 CardioAnnotate — All rights reserved &nbsp;|&nbsp;
-  <a class="ver-link" id="verLink" title="View changelog">v0.3.0</a>
+  <a class="ver-link" id="verLink" title="View changelog">v0.4.0</a>
 </footer>
 
 <script>

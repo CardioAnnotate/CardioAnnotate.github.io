@@ -390,10 +390,20 @@
             <li><a href="#beat-classification">4.1 R-Peak Beat Classification</a></li>
             <li><a href="#keyboard-shortcuts">4.2 Keyboard Shortcuts</a></li>
             <li><a href="#auto-detection">4.3 Automatic Peak Detection</a></li>
+            <li><a href="#hover-boxes">4.4 Chart Hover Boxes</a></li>
           </ul>
         </li>
-        <li><a href="#export">5. Export & Sharing</a></li>
-        <li><a href="#processing">6. Signal Processing</a></li>
+        <li><a href="#export">5. Export & Sharing</a>
+          <ul style="padding-left:20px; margin-top:4px;">
+            <li><a href="#print-report">PDF / Print Report</a></li>
+            <li><a href="#ecg-export">Clinical ECG Export (printable ECG paper)</a></li>
+          </ul>
+        </li>
+        <li><a href="#processing">6. Signal Processing</a>
+          <ul style="padding-left:20px; margin-top:4px;">
+            <li><a href="#trimming">Trimming</a></li>
+          </ul>
+        </li>
         <li><a href="#statistics">7. Statistics & Analysis</a>
           <ul style="padding-left:20px; margin-top:4px;">
             <li><a href="#basic-stats">7.1 Basic ECG Metrics</a></li>
@@ -417,13 +427,16 @@
         <li>Load and visualize ECG signals from WFDB files, CSV, or NPZ bundles</li>
         <li>Manually annotate R, P, T, U, Q, and S peaks across multiple channels</li>
         <li><strong>Classify R-peaks by beat type</strong> using 19 WFDB annotation standards</li>
-        <li><strong>Automatic peak detection</strong> using Find Peaks or Pan-Tompkins algorithms</li>
+        <li><strong>Automatic peak detection</strong> using Find Peaks (with optional height bounds) or Pan-Tompkins algorithms</li>
+        <li><strong>Undo and redo</strong> annotation edits and peak operations with <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>, up to 50 steps</li>
+        <li><strong>Switch the annotation mode from the keyboard</strong> and turn the chart's hover boxes on or off</li>
         <li><strong>Import WFDB annotation files</strong> (<code>.atr</code> and wave-specific annotation files)</li>
-        <li>Apply signal processing (resampling, filtering, inversion)</li>
+        <li>Apply signal processing (resampling, filtering, inversion) and <strong>trim the signal</strong> to a time range, with one-step undo</li>
         <li><strong>Compute Signal Quality Indices (SQI)</strong> for the visible segment</li>
         <li><strong>Compute HRV metrics</strong> (time-domain and frequency-domain) for the visible segment</li>
         <li><strong>Detect, review, and correct RR interval outliers</strong> through a suggest → preview → apply workflow with Gaussian Process regression</li>
         <li>Export annotations in JSON, CSV, WFDB, or NPZ format with enhanced options</li>
+        <li><strong>Export the ECG on calibrated clinical paper</strong> at a standard paper speed and gain, for printing or saving as a measurable PDF</li>
         <li><strong>Export and import full sessions</strong> in JSON, MAT, or NPZ format to restore the complete analysis state</li>
         <li>View real-time ECG statistics and intervals</li>
         <li>Toggle between <strong>dark and light themes</strong></li>
@@ -496,7 +509,7 @@
       
       <div class="tip">
         <h4>💡 NPZ Bundles</h4>
-        <p>NPZ bundles are a convenient format that packages the processed signal data, sampling frequency, channel names, and all peak annotations into a single compressed file. Use a full session export when you need to restore the complete workspace, including settings, view window, corrections, and computed results.</p>
+        <p>NPZ bundles are a convenient format that packages the processed signal data, sampling frequency, channel names, all peak annotations, and the trim offset (if the signal was trimmed) into a single compressed file. Use a full session export when you need to restore the complete workspace, including settings, view window, corrections, and computed results.</p>
       </div>
 
       <h3>Option D: Load Full Session</h3>
@@ -616,6 +629,7 @@ filename format gain baseline units resolution 0 0 channel_name
   "channelNames": ["MLII", "V1", "V5"],   // Array of channel names
   "units": ["mV", "mV", "mV"],            // Units per channel (optional)
   "recordBase": "100",                    // Original record name (optional)
+  "trimOffsetSec": 0,                     // Start offset (s) from the loaded record if trimmed (optional, v0.4.0+)
   "annotations": {                        // Peak annotations
     "R": {
       "0": [                              // Channel index as string key
@@ -836,6 +850,7 @@ R,1,V1,79,0.219,N</pre>
     "channelNames": ["MLII", "V1"],
     "units": ["mV", "mV"],
     "recordBase": "100",
+    "trimOffsetSec": 0,      // Start offset (s) from the loaded record; 0 if never trimmed
     "annotations": { ... }   // Same structure as annotation JSON
   })
 )</pre>
@@ -851,9 +866,9 @@ R,1,V1,79,0.219,N</pre>
               <tr><th>State Category</th><th>What Is Stored</th></tr>
             </thead>
             <tbody>
-              <tr><td><strong>Signal data</strong></td><td>The current processed waveform for every channel and the original unmodified signal, together with sampling frequency, channel names, physical units, and record identifier. Retaining both processed and original signals keeps filtering, resampling, inversion, and reset available after reload.</td></tr>
-              <tr><td><strong>Annotations and corrections</strong></td><td>All fiducial annotations, R-peak beat-type labels, and the full RR review state — every flagged case, its structural suggestion and confidence, the selected/applied action, GP correction metadata, and the undo history.</td></tr>
-              <tr><td><strong>Processing and analysis settings</strong></td><td>Filtering and resampling parameters, per-peak-type detector settings for Find Peaks and Pan-Tompkins, RR quality-control rules, selected GP kernel and hyperparameters, SQI parameters, and interface-control state.</td></tr>
+              <tr><td><strong>Signal data</strong></td><td>The current processed waveform for every channel and the original unmodified signal, together with sampling frequency, channel names, physical units, and record identifier. Retaining both processed and original signals keeps filtering, resampling, inversion, and reset available after reload. If the signal was trimmed, both are stored already trimmed, together with the cumulative trim offset (seconds from the start of the loaded record).</td></tr>
+              <tr><td><strong>Annotations and corrections</strong></td><td>All fiducial annotations, R-peak beat-type labels, and the full RR review state — every flagged case, its structural suggestion and confidence, the selected/applied action, GP correction metadata, and the undo history. The annotation undo/redo history and the <em>Undo trim</em> snapshot are working-session aids and are <strong>not</strong> saved.</td></tr>
+              <tr><td><strong>Processing and analysis settings</strong></td><td>Filtering and resampling parameters, per-peak-type detector settings for Find Peaks (including height bounds) and Pan-Tompkins, trim range inputs, RR quality-control rules, selected GP kernel and hyperparameters, SQI parameters, and interface-control state including the two hover-box checkboxes.</td></tr>
               <tr><td><strong>View and selection</strong></td><td>The active channel and current zoom window. Because SQI and HRV are evaluated on the visible segment, saving the window fixes the exact sample range used for segment-level analysis.</td></tr>
               <tr><td><strong>Computed results</strong></td><td>A provenance snapshot of reported measures, including pSQI, kSQI, basSQI, lineSQI; time- and frequency-domain HRV metrics; the ADF stationarity test; and summary statistics.</td></tr>
             </tbody>
@@ -872,7 +887,8 @@ R,1,V1,79,0.219,N</pre>
     "fs": 360,
     "channelNames": ["MLII", "V1"],
     "units": ["mV", "mV"],
-    "recordBase": "100"
+    "recordBase": "100",
+    "trimOffsetSec": 0    // cumulative trim offset (s); 0 if never trimmed
   },
   "annotations": { ... },
   "rrReview": {
@@ -908,6 +924,7 @@ R,1,V1,79,0.219,N</pre>
             <tbody>
               <tr><td>Signal data (processed + original)</td><td></td><td>✓</td><td>✓</td></tr>
               <tr><td>Peaks and beat-type labels</td><td>✓</td><td>✓</td><td>✓</td></tr>
+              <tr><td>Trim offset (start offset from the loaded record)</td><td></td><td>✓</td><td>✓</td></tr>
               <tr><td>RR review cases (flags, suggestions, applied corrections)</td><td></td><td></td><td>✓</td></tr>
               <tr><td>Processing and detector settings</td><td></td><td></td><td>✓</td></tr>
               <tr><td>View / segment selection</td><td></td><td></td><td>✓</td></tr>
@@ -986,16 +1003,16 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       <ol>
         <li>Select a <strong>Channel</strong> from the dropdown</li>
         <li>Use the mouse scroll wheel or plot controls to <strong>zoom</strong> into a region of interest</li>
-        <li>Select an annotation <strong>Mode</strong>:
+        <li>Select an annotation <strong>Mode</strong>, with the pointer or with the number key shown beside each option (see <a href="#keyboard-shortcuts">4.2 Keyboard Shortcuts</a>):
           <ul>
-            <li><strong>Navigate</strong> — Pan and zoom only</li>
-            <li><strong>Add R (Normal)</strong> — Click to add R-peaks (default type: Normal)</li>
-            <li><strong>Add P</strong> — Click to add P-peaks</li>
-            <li><strong>Add T</strong> — Click to add T-peaks</li>
-            <li><strong>Add U</strong> — Click to add U-waves</li>
-            <li><strong>Add Q</strong> — Click to add Q-waves</li>
-            <li><strong>Add S</strong> — Click to add S-waves</li>
-            <li><strong>Remove nearest</strong> — Click near a peak to delete it</li>
+            <li><strong>Navigate</strong> <kbd>0</kbd> — Pan and zoom only</li>
+            <li><strong>Add R (Normal)</strong> <kbd>1</kbd> — Click to add R-peaks (default type: Normal)</li>
+            <li><strong>Add P</strong> <kbd>2</kbd> — Click to add P-peaks</li>
+            <li><strong>Add T</strong> <kbd>3</kbd> — Click to add T-peaks</li>
+            <li><strong>Add U</strong> <kbd>4</kbd> — Click to add U-waves</li>
+            <li><strong>Add Q</strong> <kbd>5</kbd> — Click to add Q-waves</li>
+            <li><strong>Add S</strong> <kbd>6</kbd> — Click to add S-waves</li>
+            <li><strong>Remove nearest</strong> <kbd>7</kbd> — Click near a peak to delete it</li>
           </ul>
         </li>
         <li>Click on the signal where you want to place peaks</li>
@@ -1013,6 +1030,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
         <li>Click <strong>"🎯 Adjust"</strong></li>
         <li>All R, P, T, and U peaks will snap to the local maximum within the window</li>
       </ol>
+      <p>Snapping can be reverted with <strong>"↶ Undo (Ctrl+Z)"</strong> (see below).</p>
       
       <div class="warning">
         <h4>⚠️ Q and S Waves Are Not Snapped</h4>
@@ -1020,13 +1038,51 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       </div>
 
       <h3>Undo Annotations</h3>
+
+      <div class="feature" id="peak-undo-redo">
+        <h4>↶ Undo (Ctrl+Z) / ↷ Redo (Ctrl+Y)</h4>
+        <p>The <strong>"↶ Undo (Ctrl+Z)"</strong> and <strong>"↷ Redo (Ctrl+Y)"</strong> buttons (next to "Clear peaks") step backward and forward through every change to the annotations, one at a time. <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd> do the same thing from the keyboard (<kbd>Cmd</kbd> on macOS; <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> also redoes), so a misplaced click can be taken back without leaving the plot.</p>
+        <p>Both the manual edits and the bulk operations are recorded:</p>
+        <table class="beat-type-table">
+          <thead><tr><th>Recorded change</th><th>Where it comes from</th></tr></thead>
+          <tbody>
+            <tr><td>Add a peak</td><td>A click on the signal in any "Add" mode</td></tr>
+            <tr><td>Remove nearest</td><td>A click on the signal in "Remove nearest" mode</td></tr>
+            <tr><td>Remove last annotation</td><td>The <strong>"↶ Remove Last"</strong> button</td></tr>
+            <tr><td>Classify an R-peak</td><td>A quick classify button, a keyboard beat label, the "More..." panel, or right-click classification</td></tr>
+            <tr><td>Detect &amp; assign</td><td>Automatic detection (Section 4.3)</td></tr>
+            <tr><td>Snap/Adjust</td><td>Snap peaks to local maximum</td></tr>
+            <tr><td>Clear peaks</td><td>The "Clear peaks" button</td></tr>
+          </tbody>
+        </table>
+        <p>Up to the last <strong>50</strong> changes can be undone. Hover over either button to see which change it will undo or redo, and how many steps are available. Undo restores all annotations on every channel, the "Remove Last" history, and the RR review state to exactly how they were just before that change; redo puts back exactly what was undone.</p>
+        <ul>
+          <li>Edits made <em>after</em> a change are reverted along with it when you undo that change.</li>
+          <li>Any new change clears the redo history.</li>
+          <li>If you edit annotations after an undo, Redo asks for confirmation before discarding those edits.</li>
+          <li>RR corrections applied after an undone change are reverted with it and come back on redo.</li>
+          <li>Actions that change nothing are not recorded: a snap that moves no peak, clearing when no peaks exist, a "Remove nearest" click with no peak in range, or re-applying the beat label a peak already has.</li>
+        </ul>
+      </div>
+
       <div class="feature">
         <h4>↶ Remove Last</h4>
-        <p>Click <strong>"↶ Remove Last"</strong> to undo the most recent peak annotation. This button removes peaks in the reverse order they were added, acting as a simple undo function.</p>
+        <p>Click <strong>"↶ Remove Last"</strong> to remove the most recent peak annotation. This button works through the annotations in the reverse order they were added, which is useful for walking back a run of peaks you placed. It is itself undoable with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</p>
+        <p>The difference from Undo: <strong>Remove Last</strong> always deletes a peak, even if your most recent action was something else (a classification, a detection run). <strong>Undo</strong> reverses whatever the last change actually was.</p>
+      </div>
+
+      <div class="warning">
+        <h4>⚠️ When the Undo/Redo History Is Cleared</h4>
+        <p>Because the history refers to sample positions, it is cleared when you load a new record, session, or annotation file, trim the signal, undo a trim, or reproject annotations after resampling. The history is not saved in session files.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Undo Depth on Very Long Records</h4>
+        <p>Each recorded change stores a complete copy of the annotations, so the history is limited by an approximate memory budget as well as by the 50-step count. On an ordinary record the full 50 steps are available; on a very long recording holding tens of thousands of peaks, the oldest steps are dropped earlier and the usable depth is smaller. Undo and redo always keep at least the most recent step.</p>
       </div>
 
       <h3>Clear All Peaks</h3>
-      <p>Click <strong>"Clear peaks"</strong> to remove all R, P, Q, S, T, and U annotations. A confirmation dialog will appear.</p>
+      <p>Click <strong>"Clear peaks"</strong> to remove all R, P, Q, S, T, and U annotations. A confirmation dialog will appear. Clearing can be reverted with <strong>"↶ Undo (Ctrl+Z)"</strong>.</p>
 
       <h3>Invert ECG</h3>
       <p>Click <strong>"Invert ECG"</strong> to multiply all signal values by -1. Useful for signals with inverted polarity.</p>
@@ -1122,8 +1178,47 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       <div id="keyboard-shortcuts">
         <h3>4.2 Keyboard Shortcuts</h3>
         
-        <p>Speed up your workflow with keyboard shortcuts for R-peak classification:</p>
-        
+        <p>Three groups of shortcuts cover the annotation workflow: switching the annotation mode, classifying the last R-peak, and undoing or redoing a change. The mode keys are also printed beside each option in the <strong>Mode</strong> selector and in a hint line under the viewer controls.</p>
+
+        <h4>Annotation Mode</h4>
+        <table class="beat-type-table">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><kbd>0</kbd></td><td>Navigate (pan and zoom only)</td></tr>
+            <tr><td><kbd>1</kbd></td><td>Add R (Normal)</td></tr>
+            <tr><td><kbd>2</kbd></td><td>Add P</td></tr>
+            <tr><td><kbd>3</kbd></td><td>Add T</td></tr>
+            <tr><td><kbd>4</kbd></td><td>Add U</td></tr>
+            <tr><td><kbd>5</kbd></td><td>Add Q</td></tr>
+            <tr><td><kbd>6</kbd></td><td>Add S</td></tr>
+            <tr><td><kbd>7</kbd></td><td>Remove nearest</td></tr>
+          </tbody>
+        </table>
+        <p>Pressing a mode key is identical to changing the <strong>Mode</strong> selector by hand, and the new mode is written to the activity log. The digit is read from the physical key, so the numeric keypad works with Num Lock on or off, and keyboard layouts on which the top-row digits need <kbd>Shift</kbd> work too.</p>
+
+        <h4>Undo and Redo</h4>
+        <table class="beat-type-table">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo the last change to the annotations</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Redo the change that was just undone</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo (alternative)</td></tr>
+          </tbody>
+        </table>
+        <p>Use <kbd>Cmd</kbd> instead of <kbd>Ctrl</kbd> on macOS. These drive the same history as the toolbar buttons — see <a href="#peak-undo-redo">↶ Undo (Ctrl+Z) / ↷ Redo (Ctrl+Y)</a> for what is recorded.</p>
+
+        <h4>R-Peak Beat Classification</h4>
+        <p>These apply to the most recently added R-peak:</p>
         <table class="beat-type-table">
           <thead>
             <tr>
@@ -1146,20 +1241,35 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
           </tbody>
         </table>
 
+        <div class="feature" id="shortcut-focus">
+          <h4>When the Shortcuts Are Live</h4>
+          <p>Shortcuts act on the chart, so they step aside whenever a key belongs to the control you are using:</p>
+          <ul>
+            <li>All of them are ignored while the cursor is in a <strong>text or number field</strong> or a text area, so typing a cutoff frequency or a record name is never hijacked and the browser's own undo still works there.</li>
+            <li>They stay live while a <strong>checkbox, radio button, slider, file picker or button</strong> has focus — clicking one of those does not switch the shortcuts off.</li>
+            <li>The <strong>mode keys</strong> also work while the <strong>Mode</strong> selector itself has focus, which is where the pointer leaves it after you pick a mode by hand. They are ignored while a different dropdown has focus, because some of those (<strong>Notch</strong>, <strong>Mains</strong>, <strong>±</strong> width) have options beginning with a digit, where typing one is that dropdown's own shortcut.</li>
+            <li>The <strong>beat-label letters</strong> are ignored while any dropdown has focus, since letters drive its option type-ahead.</li>
+            <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd> work from any dropdown, checkbox or button.</li>
+            <li>Apart from the undo and redo combinations, no shortcut fires while <kbd>Ctrl</kbd>, <kbd>Cmd</kbd> or <kbd>Alt</kbd> is held, so browser and system accelerators such as <kbd>Ctrl</kbd>+<kbd>S</kbd> and <kbd>Ctrl</kbd>+<kbd>A</kbd> are left alone.</li>
+          </ul>
+          <p>If a shortcut seems unresponsive, the cursor is most likely still in a text or number field: click once on the plot and press the key again.</p>
+        </div>
+
         <div class="tip">
           <h4>💡 Efficient Workflow</h4>
-          <p>The fastest workflow is:</p>
+          <p>The fastest workflow keeps both hands in place — the pointer on the plot, the other hand on the keyboard:</p>
           <ol>
-            <li>Set mode to "Add R (Normal)"</li>
+            <li>Press <kbd>1</kbd> to switch to "Add R (Normal)"</li>
             <li>Click on each R-peak</li>
-            <li>Immediately press a keyboard shortcut to classify (if not normal)</li>
-            <li>Continue to next peak</li>
+            <li>Immediately press a beat-label key to classify (if not normal)</li>
+            <li>Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> if a click lands in the wrong place, then click again</li>
+            <li>Press another number key to move on to a different peak type without reaching for the Mode selector</li>
           </ol>
         </div>
 
         <div class="warning">
-          <h4>⚠️ Keyboard Shortcuts Only Work on Last R-Peak</h4>
-          <p>Keyboard shortcuts classify the most recently added R-peak. To classify older R-peaks, use the right-click method or the "More..." panel.</p>
+          <h4>⚠️ Beat-Label Shortcuts Only Work on the Last R-Peak</h4>
+          <p>The beat-label keys classify the most recently added R-peak. To classify older R-peaks, use the right-click method or the "More..." panel. The mode and undo/redo shortcuts are not restricted this way.</p>
         </div>
       </div>
 
@@ -1174,7 +1284,8 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
           <ul>
             <li><strong>Polarity:</strong> Detect maxima, minima, or absolute value maxima</li>
             <li><strong>Min distance (ms):</strong> Minimum distance between consecutive peaks</li>
-            <li><strong>Threshold:</strong> Minimum height for peaks (in signal units)</li>
+            <li><strong>Threshold:</strong> Simple cutoff on the raw signal value, in signal units: <code>x ≥ threshold</code> for Maxima, <code>x ≤ threshold</code> for Minima, and <code>|x| ≥ |threshold|</code> for |x| maxima (optional)</li>
+            <li><strong>Height:</strong> Required peak height, in signal units, following the <code>height</code> argument of SciPy's <code>find_peaks</code> (optional; see below)</li>
             <li><strong>Prominence:</strong> Minimum vertical prominence required</li>
             <li><strong>Prom window (ms):</strong> Window size for prominence calculation</li>
           </ul>
@@ -1192,6 +1303,28 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
           </ul>
         </div>
 
+        <div class="feature" id="find-peaks-height">
+          <h4>Find Peaks Height Bounds</h4>
+          <p>The <strong>Height</strong> field accepts nothing, one number, or two numbers. The first number is <strong>always</strong> the minimum, and the second, if supplied, is the maximum:</p>
+          <table class="beat-type-table">
+            <thead><tr><th>Entry</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><em>(blank)</em> or <code>None</code></td><td>No height limit</td></tr>
+              <tr><td><code>0.5</code></td><td>Height ≥ 0.5</td></tr>
+              <tr><td><code>0.5, 1.2</code></td><td>0.5 ≤ height ≤ 1.2</td></tr>
+              <tr><td><code>None, 1.2</code> or <code>, 1.2</code></td><td>Height ≤ 1.2 (maximum only)</td></tr>
+            </tbody>
+          </table>
+          <p>The two numbers may also be separated by a space or semicolon, or written in brackets, e.g. <code>[0.5, 1.2]</code> or <code>(0.5; 1.2)</code>. If the minimum is greater than the maximum, a value is not a number, or more than two values are entered, detection does not run and an error is shown in the status badge.</p>
+          <p>As in SciPy (where minima are found by running <code>find_peaks(-x, height=...)</code>), the height a peak is compared against depends on the polarity:</p>
+          <ul>
+            <li><strong>Maxima:</strong> the signal value <code>x</code></li>
+            <li><strong>Minima:</strong> the depth <code>−x</code>. For example, <code>0.2, 1</code> keeps troughs whose value lies between −1 and −0.2.</li>
+            <li><strong>|x| maxima:</strong> the absolute value <code>|x|</code></li>
+          </ul>
+          <p>The Height value is saved per peak type together with the other detector settings, and in full sessions.</p>
+        </div>
+
         <h4>Detection Scope</h4>
         <ul>
           <li><strong>Full signal:</strong> Process the entire recording</li>
@@ -1202,6 +1335,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
         <ul>
           <li><strong>Replace existing (in scope):</strong> If checked, removes existing peaks of the target type before detection</li>
         </ul>
+        <p>Every detection run that assigns peaks can be reverted with <strong>"↶ Undo (Ctrl+Z)"</strong> and reapplied with <strong>"↷ Redo (Ctrl+Y)"</strong> (see <a href="#peak-undo-redo">Undo and Redo</a>).</p>
 
         <div class="tip">
           <h4>💡 Save Settings per Peak Type</h4>
@@ -1214,8 +1348,43 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
             <li>For R-peaks, Pan-Tompkins usually works best</li>
             <li>For P and T waves, use Find Peaks with appropriate polarity and distance settings</li>
             <li>For Q and S waves, use Find Peaks with "Minima" polarity</li>
+            <li>Use a Height range to separate peaks of different sizes, e.g. a minimum height to skip small P or T waves when detecting R-peaks, or a maximum to exclude large artifacts</li>
             <li>Run detection on a visible segment first to tune parameters before processing full signal</li>
           </ul>
+        </div>
+      </div>
+
+      <div id="hover-boxes">
+        <h3>4.4 Chart Hover Boxes</h3>
+
+        <p>Two checkboxes in the viewer controls row, beside "Invert ECG", decide which hover boxes the chart shows when the pointer rests on it. Both are on by default and both are stored in full sessions.</p>
+
+        <table class="beat-type-table">
+          <thead>
+            <tr><th>Checkbox</th><th>Controls</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Hover coordinates</strong></td>
+              <td>The box reporting the x/y coordinates of the ECG trace under the pointer.</td>
+            </tr>
+            <tr>
+              <td><strong>Annotation tooltips</strong></td>
+              <td>The box over an annotation marker: the peak type and sample index for R/P/Q/S/T/U markers, and the full case detail for RR-review status rings, interval segments, synthetic-peak markers, and uncommitted preview markers (Section 7.4).</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p>Between them the two checkboxes account for every hover box on the chart, and they are independent — turn off the coordinates while keeping annotation detail, or the reverse.</p>
+
+        <div class="tip">
+          <h4>💡 Clicking Still Works With the Boxes Turned Off</h4>
+          <p>Turning a hover box off only hides the label. You can still click the trace to add or remove a peak, right-click near an R-peak to classify it, and click a flagged ring to open its RR review panel.</p>
+        </div>
+
+        <div class="tip">
+          <h4>💡 When to Turn Them Off</h4>
+          <p>Turn <strong>Annotation tooltips</strong> off when annotating densely, where the box over one marker can cover the next peak you want to click. Turn both off for a clean screenshot or when reading waveform morphology, and turn them back on to inspect sample positions or read why an RR interval was flagged.</p>
         </div>
       </div>
     </section>
@@ -1257,6 +1426,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
         <li>All current processed signal data</li>
         <li>Sampling frequency and channel metadata</li>
         <li>All peak annotations with beat types</li>
+        <li>The trim offset, if the signal was trimmed</li>
       </ul>
       <p>This format is useful for exchanging processed signals and annotations in a compact Python-compatible archive. Use full session export when you need exact workspace restoration.</p>
 
@@ -1264,9 +1434,9 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       <p>Click the full session export control to save the complete analysis state in <code>.json</code>, <code>.mat</code>, or <code>.npz</code> format. A session contains:</p>
       <ul>
         <li>Original and current processed signals for every channel</li>
-        <li>Sampling frequency, channel names, units, and record identifier</li>
+        <li>Sampling frequency, channel names, units, record identifier, and trim offset</li>
         <li>All annotations, R-peak beat classifications, flagged RR intervals, and GP-corrected RR values</li>
-        <li>Filtering, resampling, detector, SQI, RR quality-control, GP kernel, and GP hyperparameter settings</li>
+        <li>Filtering, resampling, trim range, detector (including Find Peaks height bounds), SQI, RR quality-control, GP kernel, and GP hyperparameter settings</li>
         <li>The active channel and current zoom window used for visible-segment analysis</li>
         <li>A saved snapshot of SQI, HRV, ADF stationarity, and summary statistics</li>
       </ul>
@@ -1342,7 +1512,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
         <p>After exporting, a status message shows which files were created and the count of each peak type (e.g., "✓ Exported: record.hea, record.dat, record.atr (245 R, 38 P, 41 T)").</p>
       </div>
 
-      <h3>PDF / Print Report</h3>
+      <h3 id="print-report">PDF / Print Report</h3>
       <p>Click <strong>"📄 Report"</strong> in the header to open a report-builder tab. It brings together the record metadata, peak counts, summary statistics, signal quality, HRV metrics, and the ECG, RR-tachogram, PSD, Poincaré, and HRV PSD plots into a single document you can print or save as a PDF.</p>
 
       <h4>Building the Report</h4>
@@ -1372,6 +1542,134 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       <div class="feature">
         <h4>Keep the Main Tab Open</h4>
         <p>The report tab pulls data from the main CardioAnnotate tab each time you click "Generate report," so keep the main tab open until you are done with the report.</p>
+      </div>
+
+      <h3 id="ecg-export">Clinical ECG Export (Printable ECG Paper)</h3>
+      <p>Click <strong>"🫀 ECG export"</strong> in the header to print the record on a standard ECG grid at a calibrated paper speed and gain, so that intervals and amplitudes can be measured directly off the page with calipers or a ruler. As with the report, printing goes through the browser's own print dialog, so the result can be saved as a PDF with no additional software.</p>
+
+      <div class="feature">
+        <h4>How This Differs From the Report</h4>
+        <p>The <strong>Report</strong> gathers metadata, statistics, and analysis plots into a document to be read. The <strong>ECG export</strong> produces the waveform itself on calibrated graph paper, in the layout a clinical ECG is normally read in. Use the report to communicate an analysis; use the ECG export when the trace itself has to be measured.</p>
+      </div>
+
+      <h4>Calibration</h4>
+      <p>Every page is drawn as an SVG whose width and height are given in millimeters, with a matching page rule, so one millimeter in the drawing is one millimeter on paper. The background is the conventional ECG grid: 1 mm minor squares and 5 mm major squares.</p>
+
+      <table class="beat-type-table">
+        <thead>
+          <tr><th>Setting</th><th>1 mm</th><th>One large square (5 mm)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>25 mm/s</strong> (standard)</td><td>40 ms</td><td>200 ms</td></tr>
+          <tr><td>50 mm/s</td><td>20 ms</td><td>100 ms</td></tr>
+          <tr><td>12.5 mm/s</td><td>80 ms</td><td>400 ms</td></tr>
+          <tr><td><strong>10 mm/mV</strong> (standard)</td><td>0.1 mV</td><td>0.5 mV</td></tr>
+          <tr><td>20 mm/mV</td><td>0.05 mV</td><td>0.25 mV</td></tr>
+          <tr><td>5 mm/mV</td><td>0.2 mV</td><td>1.0 mV</td></tr>
+          <tr><td>2.5 mm/mV</td><td>0.4 mV</td><td>2.0 mV</td></tr>
+        </tbody>
+      </table>
+
+      <div class="warning">
+        <h4>⚠️ Print at 100% Scale or the Calibration Is Lost</h4>
+        <p>The millimeter scale only survives printing if the browser prints at full size. In the print dialog, set <strong>Scale</strong> to 100% &mdash; not <strong>"Fit to page"</strong> &mdash; set <strong>Margins</strong> to None, and choose the same paper size you selected in the form. "Fit to page" silently shrinks the sheet, and every measurement taken from it along with it. The bar above the preview repeats these settings for the page you generated.</p>
+      </div>
+
+      <h4>Layouts</h4>
+      <p>The layouts offered depend on the record. The twelve standard leads are recognized from the channel names, and when all twelve are present the two clinical grid layouts become available in addition to the general-purpose ones.</p>
+      <table class="beat-type-table">
+        <thead>
+          <tr><th>Layout</th><th>Requires</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>12-lead, 3 &times; 4 with rhythm strip</strong></td>
+            <td>All 12 leads</td>
+            <td>The standard clinical page. Four columns, each carrying a quarter of the segment (2.5 s of a 10 s segment), in the conventional cell order I, aVR, V1, V4 / II, aVL, V2, V5 / III, aVF, V3, V6, with one chosen lead printed full width underneath as the rhythm strip. The rhythm lead defaults to II and can be set to any available lead, the active channel, or omitted.</td>
+          </tr>
+          <tr>
+            <td><strong>12-lead, 6 &times; 2</strong></td>
+            <td>All 12 leads</td>
+            <td>Two columns of six leads, each column carrying half the segment.</td>
+          </tr>
+          <tr>
+            <td><strong>Stacked leads</strong></td>
+            <td>Any</td>
+            <td>Each selected channel on its own row, every row showing the whole segment. Useful for a 2- or 3-channel record such as MIT-BIH.</td>
+          </tr>
+          <tr>
+            <td><strong>Continuous rhythm strips</strong></td>
+            <td>Any</td>
+            <td>The segment is cut into consecutive rows that read down the page, as on a telemetry or Holter printout, continuing onto further pages as needed. Seconds per row defaults to whatever fits the page width; rows per page is adjustable. When more than one channel is selected, each time slice shows every selected channel as its own row.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>The default is the 3 &times; 4 clinical layout for a 12-lead record and continuous rhythm strips otherwise.</p>
+
+      <div class="feature">
+        <h4>Lead Name Recognition</h4>
+        <p>Lead names are matched case-insensitively and ignore spaces, underscores, hyphens, and brackets, so the common spellings across PhysioNet databases are all understood: <code>I</code>, <code>II</code>, <code>Lead III</code>, <code>ECG I</code>; the MIT-BIH modified limb leads <code>MLI</code>, <code>MLII</code>, <code>MLIII</code> (mapped to I, II, III); <code>aVR</code>, <code>AVR</code>, <code>VR</code>; and <code>V1</code> through <code>V6</code> in any case, with or without a leading <code>M</code>. A channel that is not a standard lead, such as <code>ABP</code> or <code>RESP</code>, is simply not matched. If a record does carry all twelve leads but the grid layouts are not offered, the channel names are the place to look.</p>
+      </div>
+
+      <h4>Segment</h4>
+      <p>The exported segment can be the <strong>visible window</strong> (the current zoom, the default), the <strong>whole record</strong>, or a <strong>custom</strong> start and duration in seconds. The form reports the resolved range beneath the choice.</p>
+
+      <h4>Paper and Appearance</h4>
+      <ul>
+        <li><strong>Paper speed</strong> &mdash; 12.5, 25 (default), or 50 mm/s</li>
+        <li><strong>Gain</strong> &mdash; 2.5, 5, 10 (default), or 20 mm/mV</li>
+        <li><strong>Page size</strong> &mdash; A4 or Letter, landscape (default) or portrait</li>
+        <li><strong>Grid</strong> &mdash; red (standard thermal paper, default), gray, or no grid</li>
+        <li><strong>Margin</strong> and <strong>trace thickness</strong> in millimeters</li>
+        <li><strong>Baseline</strong> &mdash; center each row on its own segment median (default), or keep the signal zero. Centering removes a DC offset or slow baseline drift so the trace stays inside its row; it shifts the trace vertically and never changes its shape or amplitude.</li>
+      </ul>
+
+      <h4>What to Include</h4>
+      <ul>
+        <li><strong>1 mV calibration pulse</strong> (default on) &mdash; the conventional 1 mV by 200 ms step at the start of each row, so the scale can be confirmed from the strip itself</li>
+        <li><strong>Header with record details</strong> (default on) &mdash; title, record name, sampling rate, exported segment, trim offset if the signal was trimmed, and a timestamp</li>
+        <li><strong>Measurement block</strong> (default off) &mdash; HR, RR, PR, QRS, QT, and QTc printed across the header</li>
+        <li><strong>Elapsed time on each strip row</strong> (default on) &mdash; the start time of each row in the continuous strip layout</li>
+        <li><strong>Annotation markers</strong> (default off) &mdash; any of R, P, Q, S, T, and U drawn as small ticks above the trace</li>
+      </ul>
+      <p>A free-text <strong>filter annotation</strong> and an optional <strong>note</strong> can also be supplied. The filter text is printed in the footer beside the speed and gain, as on a clinical trace, and is typed by hand &mdash; it is not read from the filters applied in the Signal Processing panel, so it should be written to match what was actually applied.</p>
+
+      <div class="warning">
+        <h4>⚠️ The Measurement Block Is Not a Diagnostic Reading</h4>
+        <p>HR, RR, PR, QRS, and QT are the whole-channel averages from Section 7.1, computed from your own annotations on the chosen channel, and QTc applies Bazett's correction to them. They are only as good as the annotations behind them, and they summarize the entire record rather than the printed segment. Every page carries a research-use-only footer for this reason: CardioAnnotate is a research tool and its output is not intended for diagnostic use.</p>
+      </div>
+
+      <h4>Generating and Printing</h4>
+      <ol>
+        <li>Set the options. The summary at the foot of the form reports the milliseconds per millimeter and per large square, the millivolts per millimeter and per large square, the resulting page count, the row height, and how many millivolts a row can show before clipping.</li>
+        <li>Click <strong>"Generate ECG"</strong> to render the calibrated preview.</li>
+        <li>Adjust <strong>Preview zoom</strong> if needed. This affects the screen only and is reset automatically for printing, so it cannot alter the printed scale.</li>
+        <li>Click <strong>"🖨 Print / Save as PDF"</strong> and choose "Save as PDF" as the destination, with Scale at 100% and Margins set to None.</li>
+        <li>Click <strong>"← Back to options"</strong> to change any setting and generate again.</li>
+      </ol>
+
+      <div class="tip">
+        <h4>💡 Removing the Browser's Print Header/Footer</h4>
+        <p>As with the report, the export window opens as a blank tab, so most browsers add their own header and footer showing <code>about:blank</code> and a page number. In the print dialog, open <strong>"More settings"</strong> and turn off <strong>"Headers and footers"</strong> to print only the ECG.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Warnings Before You Print</h4>
+        <p>The form warns before producing a long page set, and when the rows are too short for the chosen gain &mdash; for example, a row that can only show &plusmn;0.6 mV will clip ordinary R waves at 10 mm/mV. The remedy is fewer rows per page, a larger page, or a lower gain. The warning is stated in millivolts rather than millimeters, because that is what determines whether a deflection fits.</p>
+      </div>
+
+      <div class="feature">
+        <h4>How the Trace Is Drawn</h4>
+        <ul>
+          <li>Traces use min/max decimation at roughly one printer pixel per bin, so a narrow QRS spike keeps its full height on a long segment instead of being thinned away by point-skipping.</li>
+          <li>A deflection taller than its row is clipped at the row boundary rather than drawn over the neighboring lead.</li>
+          <li>Channels recorded in V, &micro;V, or nV are converted so that the mm/mV gain means what it says. A channel in any other unit, such as raw ADC counts, is printed with the footer reading mm per unit instead of mm/mV, and the form says so.</li>
+        </ul>
+      </div>
+
+      <div class="feature">
+        <h4>Keep the Main Tab Open</h4>
+        <p>The export window reads the signal from the main CardioAnnotate tab each time you click "Generate ECG," so keep the main tab open until you have finished printing.</p>
       </div>
     </section>
 
@@ -1420,8 +1718,47 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
         <p>Common band-pass: 0.5 Hz (high-pass) to 40 Hz (low-pass). This removes baseline drift while preserving ECG morphology.</p>
       </div>
       
+      <h3 id="trimming">Trimming</h3>
+      <p>Shorten the recording to a time range. All channels are trimmed together, and annotations move with the signal.</p>
+
+      <div class="feature">
+        <h4>Trim to a Start/End Range</h4>
+        <ol>
+          <li>Enter <strong>Start</strong> and <strong>End</strong> and choose the units, <strong>seconds</strong> or <strong>samples</strong>. Switching units converts values you have already entered.</li>
+          <li>Optionally click <strong>"Use visible window"</strong> to fill both fields from the current zoom.</li>
+          <li>Click <strong>"✂ Trim"</strong> and confirm.</li>
+        </ol>
+        <p>The kept range is <code>[start, end)</code>: the end is <strong>exclusive</strong>, like a Python slice. For example, 0–10 s at 360 Hz keeps exactly 3600 samples. Leave Start blank to keep from the beginning, or End blank to keep to the end of the signal. An End beyond the signal length is clamped to the end.</p>
+      </div>
+
+      <div class="feature">
+        <h4>✂ Trim to Visible Window</h4>
+        <p>Click <strong>"✂ Trim to visible window"</strong> to keep exactly the samples currently shown in the plot.</p>
+      </div>
+
+      <div class="feature">
+        <h4>What Happens to Annotations and Other State</h4>
+        <ul>
+          <li>Annotations inside the kept range shift to the new start (sample indices are renumbered from 0); those outside are dropped. R-peak beat types and peak identifiers are kept.</li>
+          <li>The original (pre-processing) signal is trimmed to the same time span, so <strong>"↺ Reset all signals"</strong> stays aligned with the shifted annotations. This also holds after resampling, because the span is converted to the original sampling frequency.</li>
+          <li>RR review cases, the RR correction undo history, the "Remove Last" history, and the annotation undo/redo history are cleared, because they refer to the old sample positions.</li>
+          <li>The plot zooms out to show the whole trimmed signal, and the start/end fields are cleared.</li>
+          <li>The cumulative trim offset (seconds from the start of the loaded record) is shown as <strong>Trimmed (start offset)</strong> in the metadata panel and is stored in NPZ bundles and full sessions. Repeated trims add up.</li>
+        </ul>
+      </div>
+
+      <div class="feature">
+        <h4>↶ Undo Trim</h4>
+        <p>Click <strong>"↶ Undo trim"</strong> to restore the signal, annotations, and RR review state exactly as they were immediately before the last trim. Only the most recent trim can be undone, and any changes made after trimming (annotations, filtering, resampling, RR review) are lost when you undo it. A confirmation dialog appears first.</p>
+      </div>
+
+      <div class="warning">
+        <h4>⚠️ Trimming Is the New Baseline</h4>
+        <p>"↺ Reset all signals" does <strong>not</strong> undo a trim; it returns to the original signal over the trimmed time span. Use "↶ Undo trim" to recover the removed data, or reload the record. The Undo trim snapshot is cleared when a new record or session is loaded and is not saved in session files.</p>
+      </div>
+
       <h3>Reset to Original</h3>
-      <p>Click <strong>"↺ Reset all signals"</strong> to discard all signal processing (resampling, filtering, inversion) and return to the originally loaded signal.</p>
+      <p>Click <strong>"↺ Reset all signals"</strong> to discard all signal processing (resampling, filtering, inversion) and return to the originally loaded signal. If the signal was trimmed, the original signal is returned over the trimmed time span.</p>
       
       <div class="warning">
         <h4>⚠️ Filter Order Matters</h4>
@@ -1694,7 +2031,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
         </div>
 
         <h4>Stage 2 — Structural Suggestion</h4>
-        <p>Each flagged interval is automatically classified into one of five hypotheses by comparing its geometry, and that of its neighbouring intervals, to <code>M</code> — the local median of nearby accepted RR intervals. The highest-scoring hypothesis is shown in the review panel as the <strong>suggested interpretation</strong> with a confidence percentage, but it is only a suggestion: no peak or interval is changed until you choose and apply an action in stage 3–4.</p>
+        <p>Each flagged interval is automatically classified into one of five hypotheses by comparing its geometry, and that of its neighboring intervals, to <code>M</code> — the local median of nearby accepted RR intervals. The highest-scoring hypothesis is shown in the review panel as the <strong>suggested interpretation</strong> with a confidence percentage, but it is only a suggestion: no peak or interval is changed until you choose and apply an action in stage 3–4.</p>
         <table class="beat-type-table">
           <thead>
             <tr><th>Hypothesis</th><th>Geometric test</th><th>Suggested action</th></tr>
@@ -1702,7 +2039,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
           <tbody>
             <tr><td><strong>Missing R-peak</strong></td><td>gap ÷ <code>M</code> exceeds the missing-gap ratio and is close to an integer multiple of <code>M</code></td><td>Add missing R peak(s)</td></tr>
             <tr><td><strong>False positive</strong></td><td>the two intervals either side of an interior peak sum to approximately one normal interval (<code>|L+R−M|/M</code> small) and both are short relative to <code>M</code></td><td>Delete false-positive R peak</td></tr>
-            <tr><td><strong>Misplaced peak</strong></td><td>one neighbouring interval is long and the other short by more than α, but their sum is still ≈2<code>M</code></td><td>Move misplaced R peak</td></tr>
+            <tr><td><strong>Misplaced peak</strong></td><td>one neighboring interval is long and the other short by more than α, but their sum is still ≈2<code>M</code></td><td>Move misplaced R peak</td></tr>
             <tr><td><strong>Physiological</strong></td><td>interval falls within the absolute physiological limits (so is not itself implausible) but was flagged, e.g. by the rate-of-change rule</td><td>Retain as physiological</td></tr>
             <tr><td><strong>Timing artifact</strong></td><td>fallback hypothesis used when no structural pattern fits</td><td>Correct timing with GP</td></tr>
           </tbody>
@@ -1710,7 +2047,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
 
         <div class="feature">
           <h4>Structural thresholds</h4>
-          <p>Click <strong>"Structural thresholds ▾"</strong> in the RR review box to adjust the parameters that drive the hypotheses above and the QRS-snapping behaviour used when applying a repair.</p>
+          <p>Click <strong>"Structural thresholds ▾"</strong> in the RR review box to adjust the parameters that drive the hypotheses above and the QRS-snapping behavior used when applying a repair.</p>
           <table class="beat-type-table">
             <thead><tr><th>Parameter</th><th>Meaning</th><th>Default</th></tr></thead>
             <tbody>
@@ -1723,7 +2060,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
               <tr><td>Snap window (ms)</td><td>half-width of the QRS search window when snapping a proposed peak</td><td>150</td></tr>
               <tr><td>Snap min confidence</td><td>minimum QRS morphology confidence required before snapping</td><td>0.35</td></tr>
               <tr><td>GP input</td><td>GP regressor input axis — elapsed time in seconds, or ordinal interval index</td><td>elapsed time (s)</td></tr>
-              <tr><td>Centre GP on training mean</td><td>whether the GP mean function is the training-set mean (centred) or zero</td><td>on</td></tr>
+              <tr><td>Center GP on training mean</td><td>whether the GP mean function is the training-set mean (centered) or zero</td><td>on</td></tr>
               <tr><td>Snap to QRS by default</td><td>whether newly proposed peaks are snapped to the nearest local QRS candidate</td><td>on</td></tr>
               <tr><td>Preview before applying</td><td>whether choosing an action shows a preview overlay instead of applying immediately</td><td>on</td></tr>
             </tbody>
@@ -1736,7 +2073,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
         <table class="beat-type-table">
           <thead><tr><th>Action</th><th>What it proposes</th></tr></thead>
           <tbody>
-            <tr><td><strong>Correct timing with GP</strong></td><td>Re-estimates the position of the peak between two fixed neighbours using GP regression, subject to the fixed left-to-right gap (see Stage 3 GP details below)</td></tr>
+            <tr><td><strong>Correct timing with GP</strong></td><td>Re-estimates the position of the peak between two fixed neighbors using GP regression, subject to the fixed left-to-right gap (see Stage 3 GP details below)</td></tr>
             <tr><td><strong>Add missing R peak(s)</strong></td><td>Reconstructs 1 or more missing peaks inside the gap using GP regression, ranking candidate counts by agreement with the local median and posterior uncertainty</td></tr>
             <tr><td><strong>Delete false-positive R peak</strong></td><td>Removes the selected interior peak and merges its two intervals into one, provided the combined interval is physiologically valid</td></tr>
             <tr><td><strong>Move misplaced R peak</strong></td><td>Same GP-based repositioning as "Correct timing with GP", labeled separately for the misplaced-peak hypothesis</td></tr>
@@ -1761,7 +2098,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
             <tr><td>Orange</td><td>suspected false-positive R-peak</td></tr>
             <tr><td>Magenta</td><td>suspected misplaced R-peak</td></tr>
             <tr><td>Green</td><td>reviewed — retained as physiological</td></tr>
-            <tr><td>Grey (diamond / X markers)</td><td>uncommitted preview — not yet applied</td></tr>
+            <tr><td>Gray (diamond / X markers)</td><td>uncommitted preview — not yet applied</td></tr>
           </tbody>
         </table>
 
@@ -1881,8 +2218,8 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       </div>
 
       <div class="tip">
-        <h4>8. Use "Remove Last" for Quick Corrections</h4>
-        <p>If you make a mistake while annotating, use the "↶ Remove Last" button to undo the most recent annotation. This is faster than switching to "Remove nearest" mode.</p>
+        <h4>8. Use Ctrl+Z for Quick Corrections</h4>
+        <p>If a click lands in the wrong place while annotating, press <kbd>Ctrl</kbd>+<kbd>Z</kbd> and click again — far faster than switching to "Remove nearest" mode and back. The same key reverses a mistaken classification, a whole detection run, a snap, or a "Clear peaks". Use "↶ Remove Last" when you specifically want to delete the most recently added peak rather than reverse your last action, whatever it was.</p>
       </div>
 
       <div class="tip">
@@ -1901,7 +2238,27 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       </div>
 
       <div class="tip">
-        <h4>12. Use Full Sessions for Reproducibility</h4>
+        <h4>12. Trim Before Detailed Analysis</h4>
+        <p>If only part of a recording is usable (for example, the first minutes are noisy or the electrodes came off at the end), trim it before running detection and RR review. Trimming after a long review clears the RR review history, so it is best done early.</p>
+      </div>
+
+      <div class="tip">
+        <h4>13. Tune Detection with Undo</h4>
+        <p>Try a detection setting on the full signal, and if the result is not right, press <kbd>Ctrl</kbd>+<kbd>Z</kbd> (or click "↶ Undo (Ctrl+Z)"), adjust the Height, distance, or threshold, and run again. Use <kbd>Ctrl</kbd>+<kbd>Y</kbd> to flip back and forth and compare against the previous result.</p>
+      </div>
+
+      <div class="tip">
+        <h4>14. Keep One Hand on the Number Keys</h4>
+        <p>When a record needs more than one peak type, press the mode number instead of returning to the <strong>Mode</strong> selector between peaks — <kbd>1</kbd> for R, <kbd>2</kbd> for P, <kbd>3</kbd> for T, <kbd>7</kbd> to remove the nearest peak. Combined with <kbd>Ctrl</kbd>+<kbd>Z</kbd> and the beat-label keys, a full pass over a segment needs no pointer travel outside the plot.</p>
+      </div>
+
+      <div class="tip">
+        <h4>16. Check the Calibration Before Measuring a Printout</h4>
+        <p>When an exported ECG will actually be measured, confirm the print came out to scale before reaching for the calipers: a large square should measure exactly 5 mm with a ruler, and the calibration pulse should stand exactly as tall as the gain printed in the footer (10 mm at 10 mm/mV). If either is short, the print dialog scaled the page &mdash; set Scale to 100% and Margins to None and print again.</p>
+      </div>
+
+      <div class="tip">
+        <h4>15. Use Full Sessions for Reproducibility</h4>
         <p>When sharing an analysis with collaborators or preparing work for review, export a full session rather than only annotations. The session records the visible segment, detector parameters, GP correction state, and computed SQI, HRV, and ADF results needed to reproduce the workspace.</p>
       </div>
     </section>
@@ -1950,7 +2307,22 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
 
       <div class="feature">
         <h4>Issue: Beat classification not working</h4>
-        <p><strong>Solution:</strong> Beat classification only works for R-peaks. Make sure you're in "Add R (Normal)" mode or have recently added an R-peak. Keyboard shortcuts only classify the most recently added R-peak.</p>
+        <p><strong>Solution:</strong> Beat classification only works for R-peaks. Make sure you're in "Add R (Normal)" mode or have recently added an R-peak. The beat-label keys only classify the most recently added R-peak.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: A keyboard shortcut does nothing</h4>
+        <p><strong>Solution:</strong> The cursor is most likely still in a text or number field — a filter cutoff, a snap window, a record name — where every shortcut deliberately stands aside so typing works normally. Click once on the plot and press the key again. Two more cases to check:</p>
+        <ul>
+          <li><strong>A number key with a dropdown other than Mode focused.</strong> <strong>Notch</strong>, <strong>Mains</strong> and <strong>±</strong> width have options beginning with a digit, so digits belong to those dropdowns. Click the plot first.</li>
+          <li><strong>A beat-label letter with any dropdown focused.</strong> Letters drive a dropdown's own option type-ahead. Click the plot first.</li>
+        </ul>
+        <p>Holding <kbd>Ctrl</kbd>, <kbd>Cmd</kbd> or <kbd>Alt</kbd> also suppresses every shortcut except undo and redo, so that browser and system accelerators keep working. The <kbd>8</kbd> and <kbd>9</kbd> keys are not assigned to anything. See <a href="#shortcut-focus">When the Shortcuts Are Live</a> for the full rules.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: A hover box covers the peak I am trying to click</h4>
+        <p><strong>Solution:</strong> Clear the <strong>Annotation tooltips</strong> checkbox in the viewer controls row, and the <strong>Hover coordinates</strong> checkbox as well if the trace readout is also in the way. Clicking to add, remove, classify, or open an RR review case keeps working with the boxes hidden (Section 4.4).</p>
       </div>
 
       <div class="feature">
@@ -1969,6 +2341,21 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       </div>
 
       <div class="feature">
+        <h4>Issue: Detection shows a "Height" error and nothing is detected</h4>
+        <p><strong>Solution:</strong> The Height field accepts at most two numbers, and the first must not be greater than the second. Enter nothing, a single minimum (e.g. <code>0.5</code>), or <code>min, max</code> (e.g. <code>0.5, 1.2</code>). For Minima polarity, enter positive depths (e.g. <code>0.2, 1</code> for troughs between −1 and −0.2).</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: Some annotations are missing after trimming</h4>
+        <p><strong>Solution:</strong> Annotations outside the kept range are removed. Remember the end is exclusive. Click "↶ Undo trim" to restore them, then trim again with a wider range.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: The Undo/Redo buttons are grayed out</h4>
+        <p><strong>Solution:</strong> There is nothing to undo or redo. The history is cleared when you load a record, session, or annotation file, trim, undo a trim, or reproject annotations, so it starts empty after any of those. Redo is also cleared by any new change. Note that actions which changed nothing are never recorded — a snap that moved no peak, a "Remove nearest" click with no peak in range, or re-applying a beat label a peak already had.</p>
+      </div>
+
+      <div class="feature">
         <h4>Issue: HRV metrics show "—"</h4>
         <p><strong>Solution:</strong> HRV requires R-peaks in the visible segment. Time-domain metrics need ≥2 R-peaks; frequency-domain metrics need ≥4 RR intervals. Zoom to include more heartbeats.</p>
       </div>
@@ -1983,6 +2370,26 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
         <p><strong>Solution:</strong> Confirm that the file is a CardioAnnotate full session rather than an annotation-only JSON/CSV file or a signal bundle. Full sessions include signals, annotations, corrections, settings, view state, and results. If the visible segment differs after import, check that the saved session contained the expected zoom window and active channel.</p>
       </div>
       
+      <div class="feature">
+        <h4>Issue: The printed ECG does not measure correctly</h4>
+        <p><strong>Solution:</strong> The print dialog almost certainly scaled the page. Set <strong>Scale</strong> to 100% rather than "Fit to page", set <strong>Margins</strong> to None, and select the same paper size you chose in the export form. Verify with a ruler: one large square must be 5 mm, and the calibration pulse must match the gain printed in the footer.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: The 12-lead layouts are not offered</h4>
+        <p><strong>Solution:</strong> The 3 &times; 4 and 6 &times; 2 layouts appear only when all twelve standard leads are recognized in the channel names. Check the channel list in the metadata panel: a record missing a lead, or using names the importer cannot match to a standard lead, falls back to the stacked and continuous-strip layouts, which work with any channel count. Common spellings including <code>MLII</code>, <code>AVR</code>, and <code>v5</code> are recognized; see <a href="#ecg-export">Clinical ECG Export</a>.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: Tall QRS complexes are cut off in the exported ECG</h4>
+        <p><strong>Solution:</strong> The rows are too short for the chosen gain, and the form warns about this before generating, stating how many millivolts a row can show. Reduce the rows per page, use a larger page or landscape orientation, or lower the gain from 10 to 5 mm/mV. Note that changing the gain changes the vertical scale of the printout, so the footer value must be read when measuring amplitudes.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Issue: The ECG export or report window does not open</h4>
+        <p><strong>Solution:</strong> Both open a new window, so a pop-up blocker will stop them. Allow pop-ups for this page in the browser's address bar, then click the button again.</p>
+      </div>
+
       <h3>Performance Tips</h3>
       <ul>
         <li><strong>Large Files:</strong> For signals >1 million samples, operations may take several seconds. Be patient and watch the console log for progress.</li>
@@ -2012,13 +2419,15 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
       <ul>
         <li><strong>Implementation:</strong> JavaScript + Pyodide (Python 3.11 in WebAssembly)</li>
         <li><strong>Dependencies:</strong> WFDB-Python, NumPy, SciPy, Plotly.js</li>
-        <li><strong>Signal Processing:</strong> Butterworth filters (order 4), zero-phase filtering (filtfilt), polyphase resampling</li>
-        <li><strong>Visualization:</strong> Plotly.js for interactive plotting with color-coded beat types</li>
+        <li><strong>Signal Processing:</strong> Butterworth filters (order 4), zero-phase filtering (filtfilt), polyphase resampling, and signal trimming with annotation shifting</li>
+        <li><strong>Visualization:</strong> Plotly.js for interactive plotting with color-coded beat types and independently switchable hover boxes</li>
         <li><strong>Privacy:</strong> 100% client-side processing, no server uploads</li>
         <li><strong>Beat Classification:</strong> 19 WFDB annotation codes following PhysioNet standards</li>
+        <li><strong>Editing:</strong> 50-step undo/redo over manual annotation edits and bulk peak operations, with keyboard shortcuts for undo/redo, annotation mode, and beat labels</li>
         <li><strong>HRV Analysis:</strong> Time-domain (SDNN, RMSSD, pNN50), frequency-domain (ULF, VLF, LF, HF) with Welch's PSD, and nonlinear (Poincaré SD1/SD2/SD2:SD1, sample entropy) metrics</li>
         <li><strong>RR Correction:</strong> four-stage review workflow (detect → structural suggestion → preview → apply) with Gaussian Process regression, multiple kernel options (RQ, Matérn, Periodic, Brownian), adjustable optimized hyperparameters, and full undo</li>
         <li><strong>Session Management:</strong> Full-state export and import in JSON, MAT, and NPZ containers for reproducible analysis restoration</li>
+        <li><strong>Clinical ECG Export:</strong> Print-calibrated millimeter-scale SVG pages at selectable paper speed and gain, with the standard 1 mm / 5 mm grid, 12-lead 3 &times; 4 and 6 &times; 2 clinical layouts, stacked leads, continuous rhythm strips, and PDF output through the browser print dialog</li>
       </ul>
       <h3>Acknowledgments</h3>
       <p>This toolkit builds upon the excellent work of:</p>
@@ -2039,7 +2448,7 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
 
   <footer>
     <p><strong>CardioAnnotate</strong> - A Toolkit for ECG Peak Labeling and Processing</p>
-    <p><button class="version-link" onclick="showChangelogModal()">Version 0.3.0</button> | 100% Client-Side Processing | Privacy-Preserving | Open Standards | WFDB Compatible</p>
+    <p><button class="version-link" onclick="showChangelogModal()">Version 0.4.0</button> | 100% Client-Side Processing | Privacy-Preserving | Open Standards | WFDB Compatible</p>
     <p style="font-size:12px; margin-top:10px;">
     This software is provided "as is", without warranties of any kind, express or implied.
   </p>
@@ -2053,7 +2462,8 @@ export.dat 16 200(0) 0 16 0 0 0 V1</pre>
         <button class="modal-close" onclick="closeChangelogModal()">×</button>
       </div>
       <ul class="changelog-list">
-        <li><strong>Initial Releas.</li>
+        <li><strong>v0.4.0</strong> — Find Peaks <a href="#find-peaks-height" onclick="closeChangelogModal()">height bounds</a> (min, or min and max, following SciPy); <a href="#trimming" onclick="closeChangelogModal()">signal trimming</a> by start/end range or visible window, with one-step Undo trim; 50-step <a href="#peak-undo-redo" onclick="closeChangelogModal()">undo and redo</a> over manual annotation edits as well as Detect &amp; assign, Snap/Adjust and Clear peaks, with <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>; <a href="#keyboard-shortcuts" onclick="closeChangelogModal()">number-key shortcuts</a> for the annotation mode; <a href="#hover-boxes" onclick="closeChangelogModal()">checkboxes</a> to turn the chart's coordinate and annotation hover boxes on or off; trim offset stored in NPZ bundles and sessions; <a href="#ecg-export" onclick="closeChangelogModal()">clinical ECG export</a> — the record printed on a standard ECG grid at a calibrated paper speed and gain (25 mm/s and 10 mm/mV by default, 12.5–50 mm/s and 2.5–20 mm/mV available), measurable directly off the page and saved as a PDF through the browser print dialog, with twelve-lead records recognized from their channel names and laid out 3 &times; 4 with a rhythm strip or 6 &times; 2, any record printable as stacked leads or continuous rhythm strips, and optional calibration pulse, record header, measurement block and annotation overlays on A4 or Letter.</li>
+        <li><strong>Initial Release.</strong></li>
       </ul>
     </div>
   </div>
